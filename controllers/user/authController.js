@@ -1,4 +1,5 @@
 import User from '../../models/User.js';
+import Product from '../../models/Products.js'
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
@@ -837,8 +838,70 @@ const resetPassword = async (req, res) => {
     }
 };
 
+const advancedSearch = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) {
+            return res.json([]);
+        }
+        console.log('Search query:', q);
+
+        const products = await Product.find({
+            $or: [
+                { name: { $regex: q, $options: 'i' } },
+                { description: { $regex: q, $options: 'i' } }
+            ],
+            isListed: true,
+            isDeleted: false
+        })
+            .populate('category', 'name')
+            .select('name category images')
+            .limit(10)
+            .lean();
+
+        // Transform the data to match the frontend expectations
+        const transformedProducts = products.map(product => ({
+            _id: product._id,
+            name: product.name,
+            category: product.category?.name || '',
+            thumbnail: product.images[0] || ''
+        }));
+
+        console.log('Found products:', transformedProducts);
+
+        res.json(transformedProducts);
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const getNewArrivals = async (req, res) => {
+    try {
+        const newArrivals = await Product.find({ isListed: true })
+            .sort({ createdAt: -1 })
+            .limit(8)
+            .populate('category')
+            .lean()  // Convert to plain JavaScript object
+
+        // If category population fails, send products without category details
+        const safeNewArrivals = newArrivals.map(product => {
+            if (!product.category) {
+                product.category = null;
+            }
+            return product;
+        });
+
+        res.status(200).json(safeNewArrivals)
+    } catch (error) {
+        console.error('Detailed error:', error);
+        res.status(500).json({ 
+            message: 'Error fetching new arrivals',
+            error: error.message
+        });
+    }
+}
 
 
-
-export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword };
+export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals };
 

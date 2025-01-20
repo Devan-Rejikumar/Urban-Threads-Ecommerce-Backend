@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { registerUser, loginUser, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword} from '../controllers/user/authController.js';
+import { registerUser, loginUser, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals} from '../controllers/user/authController.js';
 import passport from 'passport';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import addressController from '../controllers/user/addressController.js';
@@ -60,6 +60,10 @@ const validatePasswordChange = (req,res,next) =>{
 }
 
 router.put('/change-password', verifyToken, validatePasswordChange,changePassword)
+router.get('/search', advancedSearch);
+
+router.get('/new-arrivals', getNewArrivals )
+
 
 
 
