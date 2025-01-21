@@ -5,6 +5,7 @@ import passport from 'passport';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import addressController from '../controllers/user/addressController.js';
 import changePassword from '../controllers/user/changePasswordController.js';
+import cartController from '../controllers/user/cartController.js';
 const { getAddresses, getAddress, createAddress, updateAddress, deleteAddress } = addressController;
 
 const router = express.Router();
@@ -63,6 +64,9 @@ router.put('/change-password', verifyToken, validatePasswordChange,changePasswor
 router.get('/search', advancedSearch);
 
 router.get('/new-arrivals', getNewArrivals )
+
+
+
 
 
 
