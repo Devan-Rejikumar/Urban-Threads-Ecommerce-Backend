@@ -246,4 +246,12 @@ const deleteAddress = async (req, res) => {
     }
 }
 
+const addressManagement = async (req, res) => {
+    try {
+        
+    } catch (error) {
+        
+    }
+}
+
 export default { getAddress, getAddresses, createAddress, updateAddress, deleteAddress }

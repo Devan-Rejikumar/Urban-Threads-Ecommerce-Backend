@@ -6,6 +6,7 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 import addressController from '../controllers/user/addressController.js';
 import changePassword from '../controllers/user/changePasswordController.js';
 import cartController from '../controllers/user/cartController.js';
+
 const { getAddresses, getAddress, createAddress, updateAddress, deleteAddress } = addressController;
 
 const router = express.Router();
@@ -44,6 +45,7 @@ router.post('/address',verifyToken, createAddress);
 router.get('/address/:id', verifyToken, getAddress);
 router.put('/address/:id',verifyToken, updateAddress);
 router.delete('/address/:id',verifyToken, deleteAddress);
+
 
 
 const validatePasswordChange = (req,res,next) =>{
