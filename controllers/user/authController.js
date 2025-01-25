@@ -618,108 +618,96 @@ const verifyUserToken = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
     try {
-       
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ message: 'No token provided' });
-        }
 
-        const token = authHeader.split(' ')[1];
-        
-        
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
-       
-        const user = await User.findById(decoded.id);
+        if (!req.user) {
+            return res.status(401).json({ message: "User not authenticated" })
+        }
+        const user = await User.findById(req.user.id);
+
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            return res.status(400).json({ message: "User not found" })
         }
 
-       
         res.status(200).json({
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,
             phone: user.phone,
             status: user.status,
-        });
+
+
+        })
     } catch (error) {
-        console.error('Error fetching user profile:', error);
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ message: 'Invalid token' });
-        }
-        res.status(500).json({ message: 'Server error while fetching profile' });
+        console.error('Error fetching user profile:', error)
+        res.status(500).json({ message: 'Server error while fetching profile' })
+
     }
-};
+}
 
 const updateUsersProfile = async (req, res) => {
     try {
-        // Get user ID from middleware
-        const userId = req.user.id;
-        
-        if (!userId) {
-            return res.status(401).json({ message: 'User not authenticated' });
-        }
-
         const { firstName, lastName, email, phone } = req.body;
-        
-        // Validation
         const validationErrors = {};
-        if (!firstName) validationErrors.firstName = 'First name is required';
-        if (!lastName) validationErrors.lastName = 'Last name is required';
-        if (!email) validationErrors.email = 'Email is required';
-        if (!phone) validationErrors.phone = 'Phone number is required';
+
+        if (!firstName) validationErrors.firstName = 'First name is mandatory';
+        if (!lastName) validationErrors.lastName = 'Last name is mandatory';
+        if (!email) {
+            validationErrors.email = 'Email is mandatory';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            validationErrors.email = 'Invalid email format';
+        }
+        if (!phone) validationErrors.phone = 'Phone number is mandatory';
 
         if (Object.keys(validationErrors).length > 0) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 message: 'Validation failed',
-                errors: validationErrors 
+                errors: validationErrors
             });
         }
 
-        // Check if email is already in use by another user
         const existingUser = await User.findOne({
             email: email.toLowerCase(),
-            _id: { $ne: userId }
-        });
+            _id: { $ne: req.user.id }
+        })
 
         if (existingUser) {
-            return res.status(400).json({ 
-                message: 'Email is already in use by another user' 
-            });
+            return res.status(400).json({ message: 'Email is already in use by another person' })
         }
 
-        // Update user
         const updatedUser = await User.findByIdAndUpdate(
-            userId,
+            req.user.id,
             {
                 firstName,
                 lastName,
                 email: email.toLowerCase(),
-                phone
+                phone,
+                updatedAt: Date.now()
             },
             { new: true }
-        );
 
+
+        )
         if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ message: 'User not found' })
         }
 
         res.status(200).json({
-            message: 'Profile updated successfully',
+            message: 'Profile updated Succesfully',
             user: {
                 firstName: updatedUser.firstName,
                 lastName: updatedUser.lastName,
                 email: updatedUser.email,
-                phone: updatedUser.phone
+                phone: updatedUser.phone,
+                status: updatedUser.status
             }
-        });
-
+        })
     } catch (error) {
-        console.error('Update profile error:', error);
-        res.status(500).json({ message: 'Error updating profile' });
+        console.error('Profile update error:', error);
+        res.status(500).json({
+            message: 'Server error while updating profile'
+        });
     }
-};
+}
 
 const forgotPassword = async (req, res) => {
     try {

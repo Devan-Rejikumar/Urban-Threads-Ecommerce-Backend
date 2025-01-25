@@ -1,7 +1,21 @@
 import mongoose from 'mongoose';
 
+const orderItemSchema = new mongoose.Schema({
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    price: { type: Number, required: true },
+    selectedSize: { type: String, required: true },
+    status: {
+        type: String,
+        enum: ['pending', 'cancelled'],
+        default: 'pending'
+    },
+    cancellationReason: String
+});
+
 const orderSchema = new mongoose.Schema(
   {
+    orderId: { type: String, required: true, unique: true },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -17,49 +31,15 @@ const orderSchema = new mongoose.Schema(
       enum: ['cod'],
       required: true,
     },
-    items: [
-      {
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'Product',
-          required: true,
-        },
-        selectedSize: {
-          type: String,
-          required: true,
-        },
-        quantity: {
-          type: Number,
-          required: true,
-          min: 1,
-        },
-        price: {
-          type: Number,
-          required: true,
-        },
-        status: {
-          type: String,
-          enum: ['active', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
-          default: 'active'
-        },
-        cancellationReason: {
-          type: String,
-          default: null
-        }
-      },
-    ],
+    items: [orderItemSchema],
     totalAmount: {
       type: Number,
       required: true,
     },
     status: {
       type: String,
-      enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+      enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
       default: 'pending',
-    },
-    orderId: {
-      type: String,
-      unique: true,
     },
   },
   {

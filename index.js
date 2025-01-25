@@ -17,6 +17,9 @@ import connectCloudinary from './config/cloudinaryConfig.js';
 import cartRoutes from './routes/cartRoutes.js';
 import wishlistRoutes from './routes/wishlistRoute.js';
 import userOrderRoutes from './routes/userOrderRoutes.js';
+import adminOrderRoutes from './routes/adminOrderRoutes.js';
+// import orderRoutes from './routes/orderRoutes.js';
+
 
 
 
@@ -91,6 +94,9 @@ app.use('/',cloudinaryRoutes);
 app.use('/api/cart',cartRoutes)
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api', userOrderRoutes);
+app.use('/api', adminOrderRoutes);
+// app.use('/api/orders', orderRoutes);  
+
 
 
 app.use((err, req, res, next) => {

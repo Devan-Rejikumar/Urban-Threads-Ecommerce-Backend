@@ -1,34 +1,29 @@
-// controllers/adminOrderController.js
+
 import Order from "../../models/Order.js";
 
-// Get all orders for admin
 export const getOrders = async (req, res) => {
     try {
-        const { status, page = 1, limit = 10 } = req.query;
         
-        const query = status && status !== 'All' 
-            ? { status } 
-            : {};
+        console.log('Admin making request:', req.admin);
+        
+        const { status = 'All' } = req.query;
+        
+        const query = status !== 'All' ? { status: status.toLowerCase() } : {};
 
         const orders = await Order.find(query)
-            .populate('userId', 'name email')
+            .populate('userId', 'firstName email')
             .populate('items.productId')
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(Number(limit));
+            .populate('addressId')
+            .sort({ createdAt: -1 });
 
-        const total = await Order.countDocuments(query);
+        console.log('Found orders:', orders.length);
 
         res.status(200).json({ 
             success: true, 
-            orders,
-            pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
-                totalOrders: total
-            }
+            orders 
         });
     } catch (error) {
+        console.error('Error fetching orders:', error);
         res.status(500).json({ 
             success: false, 
             message: error.message 
@@ -39,18 +34,10 @@ export const getOrders = async (req, res) => {
 // Update order status
 export const updateOrderStatus = async (req, res) => {
     try {
+        const { orderId } = req.params;
         const { status } = req.body;
-        
-        const validStatusFlow = {
-            'Pending': ['Processing', 'Cancelled'],
-            'Processing': ['Shipped', 'Cancelled'],
-            'Shipped': ['Delivered', 'Cancelled'],
-            'Delivered': [],
-            'Cancelled': []
-        };
 
-        const order = await Order.findById(req.params.orderId);
-
+        const order = await Order.findById(orderId);
         if (!order) {
             return res.status(404).json({
                 success: false,
@@ -58,26 +45,19 @@ export const updateOrderStatus = async (req, res) => {
             });
         }
 
-        const allowedNextStatuses = validStatusFlow[order.status] || [];
-        
-        if (!allowedNextStatuses.includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid status transition'
-            });
-        }
-
-        order.status = status;
+        order.status = status.toLowerCase();
         await order.save();
 
-        res.status(200).json({ 
-            success: true, 
-            order 
+        res.status(200).json({
+            success: true,
+            message: 'Order status updated successfully',
+            order
         });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
+        console.error('Error updating order status:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
     }
 };

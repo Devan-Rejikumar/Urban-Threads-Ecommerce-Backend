@@ -3,35 +3,54 @@ import Cart from '../models/Cart.js';
 
 export const createOrder = async (req, res) => {
   try {
+    console.log('Received order payload:', req.body); 
     const { addressId, paymentMethod, items, totalAmount } = req.body;
     const userId = req.user.id;
+
+    // Validate required fields
+    if (!addressId || !paymentMethod || !items || !totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
 
     const newOrder = new Order({
       userId,
       addressId,
       paymentMethod,
-      items,
+      items: items.map(item => ({
+        productId: item.productId,
+        selectedSize: item.selectedSize,
+        quantity: item.quantity,
+        price: item.price,
+        status: 'pending'
+      })),
       totalAmount,
+      status: 'pending',
+      orderId: `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`
     });
 
     await newOrder.save();
 
-    // Clear the user's cart after successful order
+    // Clear cart after successful order
     await Cart.findOneAndUpdate(
       { userId },
       { items: [], totalAmount: 0 }
     );
 
+    
+
     res.status(201).json({
       success: true,
       message: 'Order created successfully',
-      orderId: newOrder.orderId,
+      orderId: newOrder.orderId
     });
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create order',
+      message: error.message || 'Failed to create order'
     });
   }
 };
@@ -171,7 +190,10 @@ export const cancelOrderItem = async (req, res) => {
     const { itemId, reason } = req.body;
     const userId = req.user.id;
 
-    const order = await Order.findOne({ orderId, userId });
+    const order = await Order.findOne({ 
+      orderId, 
+      userId 
+    }).populate('items.productId');
 
     if (!order) {
       return res.status(404).json({
@@ -188,40 +210,22 @@ export const cancelOrderItem = async (req, res) => {
       });
     }
 
-    if (item.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: 'Item is already cancelled'
-      });
-    }
-
     // Update item status and reason
     item.status = 'cancelled';
     item.cancellationReason = reason;
 
-    // Update order status based on items status
-    if (order.items.every((i) => i.status === 'cancelled')) {
+    // Check if all items are cancelled to update order status
+    const allItemsCancelled = order.items.every(item => item.status === 'cancelled');
+    if (allItemsCancelled) {
       order.status = 'cancelled';
-    } else if (order.items.some((i) => i.status === 'processing')) {
-      order.status = 'processing';
-    } else if (order.items.some((i) => i.status === 'shipped')) {
-      order.status = 'shipped';
-    } else if (order.items.some((i) => i.status === 'delivered')) {
-      order.status = 'delivered';
-    } else if (order.items.every((i) => i.status === 'returned')) {
-      order.status = 'returned';
     }
-
-    // Recalculate total amount excluding cancelled items
-    order.totalAmount = order.items.reduce((total, item) => {
-      return item.status !== 'cancelled' ? total + (item.price * item.quantity) : total;
-    }, 0);
 
     await order.save();
 
     res.status(200).json({
       success: true,
-      message: 'Item cancelled successfully'
+      message: 'Item cancelled successfully',
+      order: order
     });
   } catch (error) {
     console.error('Error cancelling order item:', error);
