@@ -13,7 +13,7 @@ export const verifyAdminTokens = async (req, res, next) => {
 
     const decoded = jwt.verify(adminToken, process.env.JWT_SECRET);
     
-    // Validate admin role or permissions
+   
     if (!decoded.isAdmin) {
       return res.status(403).json({ 
         success: false, 
@@ -21,10 +21,10 @@ export const verifyAdminTokens = async (req, res, next) => {
       });
     }
 
-    // Attach admin info to the request for further use
+
     req.admin = decoded;
     
-    // Continue to the next middleware/route handler
+  
     next();
 
   } catch (error) {

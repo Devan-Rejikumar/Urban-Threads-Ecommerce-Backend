@@ -1,23 +1,24 @@
-import Coupons from "../../models/Coupons.js";
+import Coupon from "../../models/Coupons.js";  // Changed from Coupons to Coupon
 import Cart from "../../models/Cart.js";
-
 
 export const applyCoupon = async (req, res) => {
     try {
-        const { code } = req.body;
-        const userId = req.user.id;
+        const { code, cartTotal } = req.body;
+        console.log('Received coupon request:', { code, cartTotal }); // Debug log
 
-        const coupon = await Coupons.findOne({
+        if (!code || cartTotal === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: 'Coupon code and cart total are required'
+            });
+        }
+
+        const coupon = await Coupon.findOne({
             code: code.toUpperCase(),
-            isActive: true,
-            startDate: { $lte: new Date() },
-            endDate: { $gte: new Date() },
-            $or: [
-                { maxUse: null },
-                { usedCount: { $lt: '$maxUses' } }
-            ]
-
+            isActive: true
         });
+
+        console.log('Found coupon:', coupon); // Debug log
 
         if (!coupon) {
             return res.status(404).json({
@@ -26,36 +27,29 @@ export const applyCoupon = async (req, res) => {
             });
         }
 
-        const cart = await Cart.findOne({ userId });
-
-        if (cart.totalAmount < coupon.minimumPurchase) {
-            return res.status(400).json({
-                success: false,
-                message: `Minimum purchase amount of ${coupon.minimumPurchase} required`
-            });
-        }
-
-        let discount = 0;
+        let discountAmount = 0;
         if (coupon.discountType === 'percentage') {
-            discount = (cart.totalAmount * coupon.discountAmount) / 100;
+            discountAmount = (cartTotal * coupon.discountAmount) / 100;
             if (coupon.maxDiscount) {
-                discount = Math.min(discount, coupon.maxDiscount);
+                discountAmount = Math.min(discountAmount, coupon.maxDiscount);
             }
         } else {
-            discount = coupon.discountAmount;
+            discountAmount = Math.min(coupon.discountAmount, cartTotal);
         }
 
-        cart.couponCode = code;
-        cart.discount = discount;
-        await cart.save();
-
-        await Coupon.findByIdAndUpdate(coupon._id, {
-            $inc: { usedCount: 1 }
+        res.status(200).json({
+            success: true,
+            coupon,
+            discountAmount
         });
 
-        res.status(200).json({ success: true, cart });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error('Coupon application error:', error); // Debug log
+        res.status(500).json({
+            success: false,
+            message: 'Error applying coupon',
+            error: error.message
+        });
     }
 }
 
