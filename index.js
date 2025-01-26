@@ -7,7 +7,6 @@ import adminRoutes from './routes/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js'
 import session from 'express-session';
 import connectDB from './config/db.js';
-import passportCongig from './config/googleAuth.js';
 import setupGoogleAuth from './config/googleAuth.js';
 import cookieParser from 'cookie-parser';
 import productRoutes from './routes/productRoutes.js'
@@ -18,8 +17,7 @@ import cartRoutes from './routes/cartRoutes.js';
 import wishlistRoutes from './routes/wishlistRoute.js';
 import userOrderRoutes from './routes/userOrderRoutes.js';
 import adminOrderRoutes from './routes/adminOrderRoutes.js';
-// import orderRoutes from './routes/orderRoutes.js';
-
+import couponRoutes from './routes/couponRoutes.js';
 
 
 
@@ -95,7 +93,7 @@ app.use('/api/cart',cartRoutes)
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api', userOrderRoutes);
 app.use('/api', adminOrderRoutes);
-// app.use('/api/orders', orderRoutes);  
+app.use('/api', couponRoutes);  
 
 
 

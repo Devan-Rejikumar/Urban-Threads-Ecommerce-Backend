@@ -37,7 +37,10 @@ export const updateOrderStatus = async (req, res) => {
         const { orderId } = req.params;
         const { status } = req.body;
 
-        const order = await Order.findById(orderId);
+        const order = await Order.findById(orderId)
+        .populate('userId')
+        .populate('addressId')
+        .populate('items.productId');
         if (!order) {
             return res.status(404).json({
                 success: false,

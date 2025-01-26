@@ -311,4 +311,24 @@ const getProductById = async (req, res) => {
   }
 };
 
-export { getProducts, addProduct, editProduct, softDeleteProduct, deleteProduct,getCategories , updateProduct, toggleProductListing, getProductsByCategory, getProductById};
+const updateProductStock = async (productId,quantity) => {
+  try {
+    const product = await Product.findById(productId);
+
+    if(!product) {
+      throw new Error('Product not found');
+    } 
+
+    if(product.stock < quantity) {
+      throw new Error (`Insufficient stock. Available: ${product.stock}`)
+    }
+
+    product.stock -= quantity;
+    await product.save();
+
+  } catch (error) {
+    res.status(500).json('There is an errorrr',error)
+  }
+}
+
+export { getProducts, addProduct, editProduct, softDeleteProduct, deleteProduct,getCategories , updateProduct, toggleProductListing, getProductsByCategory, getProductById, updateProductStock};

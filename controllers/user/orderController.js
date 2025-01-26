@@ -1,4 +1,57 @@
 import Order from '../../models/Order.js';
+import Cart from '../../models/Cart.js';
+import { updateProductStock } from '../admin/productController.js';
+
+const createOrder = async (req, res) => {
+    try {
+      const { addressId, paymentMethod, items, totalAmount } = req.body;
+      const userId = req.user.id;
+
+      if (!addressId || !paymentMethod || !items || !totalAmount) {
+                return res.status(400).json({
+                  success: false,
+                  message: 'Missing required fields'
+                });
+              }
+  
+      // Reduce stock for each product
+      for (const item of items) {
+        await Product.findByIdAndUpdate(
+          item.productId, 
+          { $inc: { stock: -item.quantity } },
+          { new: true }
+        );
+      }
+  
+      const newOrder = new Order({
+        userId,
+        addressId,
+        paymentMethod,
+        items,
+        totalAmount,
+      });
+  
+      await newOrder.save();
+  
+      // Clear the user's cart after successful order
+      await Cart.findOneAndUpdate(
+        { userId },
+        { items: [], totalAmount: 0 }
+      );
+  
+      res.status(201).json({
+        success: true,
+        message: 'Order created successfully',
+        orderId: newOrder.orderId,
+      });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create order',
+      });
+    }
+  };
 
 const getOrders = async (req, res) => {
     try {
@@ -190,5 +243,6 @@ export {
     cancelOrder, 
     cancelOrderItem,
     getOrder,
-    getOrders 
+    getOrders, 
+    createOrder
 };
