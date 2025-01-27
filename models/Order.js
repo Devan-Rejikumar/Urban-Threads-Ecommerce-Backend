@@ -30,8 +30,23 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['cod'],
+      enum: ['cod','online','wallet'],
       required: true,
+    },
+    paymentStatus : {
+      type : String,
+      enum : ['pending', 'paid','failed'],
+      default : 'pending'
+    },
+    razorpayOrderId : {
+      type : String,
+      unique : true,
+      sparse : true
+    },
+    razorpayPaymentId : {
+      type : String,
+      unique : true,
+      sparse : true
     },
     items: [orderItemSchema],
     totalAmount: {
