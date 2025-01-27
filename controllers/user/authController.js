@@ -350,7 +350,7 @@ const loginUser = async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
-        console.log(token);
+        console.log('devan', token);
 
         res.cookie('token', token, {
             httpOnly: true,
@@ -570,14 +570,20 @@ const logout = async (req, res) => {
 };
 
 const verifyUserToken = async (req, res) => {
+    console.log('vjglkjpkpooigasdfghjkauthHeader');
     try {
+
+        const userToken = req.headers['authorization']?.split(' ')[1]; // "Bearer <token>"
+        console.log("nnnnnnnnnnnnnnnxxxxxxxxxxxxxxxhhhhhhhhhh",userToken)
         const authHeader = req.headers.authorization;
+        
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'No token provided or invalid format' });
         }
 
         const token = authHeader.split(' ')[1];
+        console.log('mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',token)
 
         if (!token) {
             return res.status(401).json({ message: 'No token found' });
@@ -585,12 +591,12 @@ const verifyUserToken = async (req, res) => {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findById(decoded.id);
-
+        console.log("nnnnnnnbbbbbbbbbbbbbvvvvvvvvvvvvvvv",user)
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        if (user.status !== 'active') {
+        if (user.status !== 'unblocked') {
             return res.status(403).json({ message: 'You have been blocked' });
         }
 
@@ -605,8 +611,10 @@ const verifyUserToken = async (req, res) => {
             }
         });
     } catch (error) {
+        console.log('sdfghjkjhgfdsdfghjk')
         if (error.name === 'JsonWebTokenError') {
             return res.status(401).json({ message: 'Invalid token' });
+
         }
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({ message: 'Token expired' });
@@ -895,7 +903,7 @@ const getNewArrivals = async (req, res) => {
         res.status(200).json(safeNewArrivals)
     } catch (error) {
         console.error('Detailed error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             message: 'Error fetching new arrivals',
             error: error.message
         });

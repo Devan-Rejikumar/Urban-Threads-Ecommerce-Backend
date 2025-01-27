@@ -1,6 +1,17 @@
 import Order from '../../models/Order.js';
 import Cart from '../../models/Cart.js';
-import { updateProductStock } from '../admin/productController.js';
+// import { updateProductStock } from '../admin/productController.js'
+// import Razorpay from 'razorpay';
+// import crypto from 'crypto';
+// import dotenv from 'dotenv';
+
+// dotenv.config();
+
+// const razorpay = new Razorpay({
+//     key_id: process.env.RAZORPAY_KEY_ID,
+//     key_secret: process.env.RAZORPAY_SECRET
+//   });
+
 
 const createOrder = async (req, res) => {
     try {

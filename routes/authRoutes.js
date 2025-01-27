@@ -20,7 +20,7 @@ router.post('/login', loginUser);
 // router.get('/verify-status', verifyStatus);
 router.post('/google-signup',handleGoogleSignup)
 
-router.get('/verify-status', verifyToken, verifyStatus);
+// router.get('/verify-status', verifyToken, verifyStatus);
 router.get('/verify-token',verifyUserToken)
 
 router.post('/verify-otp', verifyOTP);

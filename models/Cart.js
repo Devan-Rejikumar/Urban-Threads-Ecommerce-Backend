@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const CartItemSchema = new mongoose.Schema ({
+const CartItemSchema = new mongoose.Schema({
     productId : {
         type : mongoose.Schema.Types.ObjectId,
         ref : 'Product',
@@ -32,7 +32,26 @@ const CartSchema = new mongoose.Schema({
       type: Number,
       required: true,
       default: 0
+    },
+    couponCode: {
+        type: String,
+        default: null
+    },
+    discount: {
+        type: Number,
+        default: 0
+    },
+    finalAmount: {
+        type: Number,
+        default: function() {
+            return this.totalAmount - (this.discount || 0);
+        }
     }
-  }, { timestamps: true });
-  
-  export default mongoose.model('Cart', CartSchema);
+}, { timestamps: true });
+
+CartSchema.pre('save', function(next) {
+    this.finalAmount = this.totalAmount - (this.discount || 0);
+    next();
+});
+
+export default mongoose.model('Cart', CartSchema);
