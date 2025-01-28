@@ -1,6 +1,6 @@
 import Order from '../../models/Order.js';
 import Cart from '../../models/Cart.js';
-import { updateProductStock } from '../admin/productController.js';
+import Wallet from '../../models/Wallet.js';
 
 const createOrder = async (req, res) => {
     try {
@@ -206,9 +206,40 @@ const cancelOrderItem = async (req, res) => {
             });
         }
 
+        // Calculate refund amount
+        const refundAmount = order.items[itemIndex].price * order.items[itemIndex].quantity;
+
         // Update item status
         order.items[itemIndex].status = 'cancelled';
         order.items[itemIndex].cancellationReason = reason;
+
+        // Process refund for online/wallet payments
+        if (order.paymentMethod === 'online' || order.paymentMethod === 'wallet') {
+            // Find or create wallet
+            let wallet = await Wallet.findOne({ userId: order.userId });
+            if (!wallet) {
+                wallet = new Wallet({ userId: order.userId, balance: 0 });
+            }
+
+            // Add transaction
+            wallet.transactions.push({
+                amount: refundAmount,
+                type: 'credit',
+                source: 'order_refund',
+                orderId: order.orderId,
+                description: `Refund for cancelled item in order ${order.orderId}`,
+                status: 'completed',
+                balance: wallet.balance + refundAmount
+            });
+
+            // Update wallet balance
+            wallet.balance += refundAmount;
+            await wallet.save();
+
+            // Update order refund status
+            order.items[itemIndex].refundStatus = 'processed';
+            order.items[itemIndex].refundAmount = refundAmount;
+        }
 
         // Check if all items are cancelled
         const activeItems = order.items.filter(item => item.status === 'active');
@@ -223,7 +254,6 @@ const cancelOrderItem = async (req, res) => {
 
         await order.save();
 
-        // Return updated order
         res.status(200).json({
             success: true,
             message: 'Item cancelled successfully',
