@@ -18,37 +18,29 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
   },
-  // password: {
-  //   type: String,
-  //   required: true,
-  // },
-  // phone: {
-  //   type: String,
-  //   required: true,
-  // },
 
   password: {
     type: String,
-    required: function() {
-      return !this.googleId; // Only required if not using Google auth
+    required: function () {
+      return !this.googleId;
     }
   },
   phone: {
     type: String,
-    required: function() {
-      return !this.googleId; // Only required if not using Google auth
+    required: function () {
+      return !this.googleId;
     }
   },
-  
+
   googleId: {
     type: String,
     sparse: true,
-    unique: true,  
-    default: undefined  
+    unique: true,
+    default: undefined
   },
   status: {
     type: String,
-    enum: ['active', 'blocked'],
+    enum: ['active', 'blocked','unblocked'],
     default: 'active',
   },
   isVerified: {
@@ -71,8 +63,25 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['user', 'admin'],
     default: 'user'
-},
-
+  },
+  emailUpdateOTP : {
+    type : String
+  },
+  emailUpdateOTPExpiry : {
+    type : Date
+  },
+  newEmail : {
+    type : String,
+  },
+  phoneUpdateOTP : {
+    type : String
+  },
+  phoneUpdateOTPExpiry : {
+    type : Date
+  },
+  newPhone : {
+    type : String
+  },
   otpExpiry: {
     type: Date,
     required: false,

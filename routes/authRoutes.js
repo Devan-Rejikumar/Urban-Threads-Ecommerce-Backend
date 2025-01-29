@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { registerUser, loginUser, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals} from '../controllers/user/authController.js';
+import { registerUser, loginUser, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals, sendContactUpdateOTP, verifyContactUpdateOTP} from '../controllers/user/authController.js';
 import passport from 'passport';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import addressController from '../controllers/user/addressController.js';
@@ -45,6 +45,8 @@ router.post('/address',verifyToken, createAddress);
 router.get('/address/:id', verifyToken, getAddress);
 router.put('/address/:id',verifyToken, updateAddress);
 router.delete('/address/:id',verifyToken, deleteAddress);
+router.post('/send-contact-update-otp', verifyToken, sendContactUpdateOTP);
+router.post('/verify-contact-update-otp', verifyToken, verifyContactUpdateOTP);
 
 
 

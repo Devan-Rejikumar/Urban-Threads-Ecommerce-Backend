@@ -1,37 +1,4 @@
-// import mongoose from "mongoose";
 
-// const categorySchema = new mongoose.Schema(
-//     {
-//         name:{
-//             type : String,
-//             required : true,
-//         },
-//         isDeleted : {
-//             type : Boolean,
-//             default : false,
-//         },
-//         description :{
-//             type : String,
-//             required : true,
-//         },
-//         image :{
-//             public_id : {
-//                 type : String,
-//             },
-//             url :{
-//                 type : String,
-//             }
-//         },
-//         isActive : {
-//             type : Boolean,
-//             default : true,
-//         }
-//     },
-//     {timestamps : true }
-// )
-
-// const Category = mongoose.model('categories',categorySchema);
-// export default Category;
 
 import mongoose from "mongoose";
 

@@ -1,5 +1,6 @@
 import Order from '../models/Order.js';
 import Cart from '../models/Cart.js';
+import Wallet from '../models/Wallet.js';
 
 export const createOrder = async (req, res) => {
   try {
@@ -43,7 +44,7 @@ export const getOrders = async (req, res) => {
     const limit = parseInt(req.query.limit) || 6;
     const search = req.query.search || '';
     const status = req.query.status || 'All';
-    
+
     let query = { userId };
 
     // Add status filter if not 'All'
@@ -100,12 +101,12 @@ export const getOrderDetails = async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id;
 
-    const order = await Order.findOne({ 
+    const order = await Order.findOne({
       orderId: orderId,
-      userId: userId 
+      userId: userId
     })
-    .populate('items.productId')
-    .populate('addressId');
+      .populate('items.productId')
+      .populate('addressId');
 
     if (!order) {
       return res.status(404).json({
@@ -130,6 +131,7 @@ export const getOrderDetails = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
+    const { reason } = req.body;
     const userId = req.user.id;
 
     const order = await Order.findOne({ orderId, userId });
@@ -149,13 +151,47 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
+    if (order.paymentMethod === 'online') {
+      const refundAmount = order.totalAmount;
+
+      let wallet = await Wallet.findOne({ userId });
+      if (!wallet) {
+        wallet = new Wallet({ userId, balance: 0, transactions: [] });
+      }
+      wallet.transactions.push({
+        amount: refundAmount,
+        type: 'credit',
+        source: 'order_refund',
+        orderId: order.orderId,
+        description: `Refund for cancelled order ${order.orderId}`,
+        status: 'completed',
+        balance: wallet.balance + refundAmount
+
+      });
+
+      order.refundStatus = 'processed';
+      order.refundAmount = refundAmount;
+    }
     order.status = 'cancelled';
+    order.cancellationReason = reason;
+
+    // Update all items to cancelled status
+    order.items = order.items.map(item => ({
+      ...item.toObject(),
+      status: 'cancelled',
+      cancellationReason: reason,
+      refundStatus: order.paymentMethod === 'online' ? 'processed' : 'not_applicable',
+      refundAmount: order.paymentMethod === 'online' ? (item.price * item.quantity) : 0
+    }));
+
     await order.save();
 
     res.status(200).json({
       success: true,
-      message: 'Order cancelled successfully'
+      message: 'Order cancelled successfully',
+      order
     });
+
   } catch (error) {
     console.error('Error cancelling order:', error);
     res.status(500).json({
@@ -194,6 +230,34 @@ export const cancelOrderItem = async (req, res) => {
         message: 'Item is already cancelled'
       });
     }
+    if (order.paymentMethod === 'online') {
+      const refundAmount = item.price * item.quantity;
+
+      // Find or create wallet
+      let wallet = await Wallet.findOne({ userId });
+      if (!wallet) {
+        wallet = new Wallet({ userId, balance: 0, transactions: [] });
+      }
+
+      // Add refund transaction to wallet
+      wallet.transactions.push({
+        amount: refundAmount,
+        type: 'credit',
+        source: 'order_refund',
+        orderId: order.orderId,
+        description: `Refund for cancelled item in order ${order.orderId}`,
+        status: 'completed',
+        balance: wallet.balance + refundAmount
+      });
+
+      // Update wallet balance
+      wallet.balance += refundAmount;
+      await wallet.save();
+
+      // Update item refund status
+      item.refundStatus = 'processed';
+      item.refundAmount = refundAmount;
+    }
 
     // Update item status and reason
     item.status = 'cancelled';
@@ -221,8 +285,10 @@ export const cancelOrderItem = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Item cancelled successfully'
+      message: 'Item cancelled successfully',
+      order
     });
+    
   } catch (error) {
     console.error('Error cancelling order item:', error);
     res.status(500).json({

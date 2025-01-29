@@ -5,12 +5,8 @@ import Product from '../../models/Products.js'
 const addToCart = async (req, res) => {
     try {
         const { productId, selectedSize, quantity } = req.body;
-
-        console.log('User from token:', req.user);
-
-
         const userId = req.user.id;
-
+        console.log('Adding to cart:', { productId, selectedSize, quantity, userId });
         const product = await Product.findById(productId);
         const variant = product.variants.find(v => v.size === selectedSize);
 

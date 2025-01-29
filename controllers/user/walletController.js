@@ -107,8 +107,61 @@ const getTransactionHistory = async (req, res) => {
     }
 };
 
+
+const refundOrderAmount = async (req, res) => {
+    try {
+        const { amount, orderId } = req.body;
+        const userId = req.user.id;
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid refund amount'
+            });
+        }
+
+        let wallet = await Wallet.findOne({ userId });
+        if (!wallet) {
+            wallet = new Wallet({ 
+                userId, 
+                balance: 0,
+                transactions: [] 
+            });
+        }
+
+        const refundTransaction = {
+            amount: Number(amount),
+            type: 'credit',
+            source: 'order_refund',
+            orderId,
+            description: `Refund for order #${orderId}`,
+            status: 'completed',
+            balance: wallet.balance + Number(amount)
+        };
+
+        wallet.transactions.push(refundTransaction);
+        wallet.balance += Number(amount);
+        
+        await wallet.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Refund processed successfully',
+            wallet
+        });
+    } catch (error) {
+        console.error('Process refund error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error processing refund',
+            error: error.message
+        });
+    }
+};
+
 export {
     getWalletDetails,
     addMoneyToWallet,
-    getTransactionHistory
+    getTransactionHistory,
+    refundOrderAmount
 };

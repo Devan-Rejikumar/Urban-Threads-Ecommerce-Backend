@@ -911,5 +911,91 @@ const getNewArrivals = async (req, res) => {
 }
 
 
-export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals };
+const sendContactUpdateOTP = async (req, res) => {
+    try {
+        const { type, newValue } = req.body;
+        const userId = req.user.id;
+
+        const otp = generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); 
+
+        const user = await User.findByIdAndUpdate(userId, {
+            [`${type}UpdateOTP`]: otp,
+            [`${type}UpdateOTPExpiry`]: otpExpiry,
+            [`new${type}`]: newValue
+        });
+
+        const transporter = await createTransporter();
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: type === 'email' ? newValue : user.email,
+            subject: `Verify Your New ${type}`,
+            html: `<h2>Your OTP is: ${otp}</h2>`
+        });
+
+        res.json({ success: true, message: 'OTP sent successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const verifyContactUpdateOTP = async (req, res) => {
+    try {
+        const { type, otp, newValue } = req.body;
+        const userId = req.user.id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Verify OTP
+        if (user[`${type}UpdateOTP`] !== otp) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid OTP'
+            });
+        }
+
+        // Check OTP expiry
+        if (new Date() > user[`${type}UpdateOTPExpiry`]) {
+            return res.status(400).json({
+                success: false,
+                message: 'OTP expired'
+            });
+        }
+
+        // Update user contact info
+        user[type] = newValue;
+        user[`${type}UpdateOTP`] = undefined;
+        user[`${type}UpdateOTPExpiry`] = undefined;
+
+        await user.save();
+
+        res.json({
+            success: true,
+            message: `${type} updated successfully`,
+            user: {
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                status: user.status
+            }
+        });
+
+    } catch (error) {
+        console.error('OTP verification error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+
+export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals, sendContactUpdateOTP, verifyContactUpdateOTP };
 
