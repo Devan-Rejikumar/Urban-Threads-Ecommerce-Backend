@@ -1,4 +1,4 @@
-// routes/walletRoutes.js
+
 import express from 'express';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { getWalletDetails, addMoneyToWallet,getTransactionHistory, refundOrderAmount } from '../controllers/user/walletController.js';

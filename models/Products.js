@@ -34,23 +34,26 @@ const productSchema = new mongoose.Schema(
     description: {
       type: String,
     },
-    variants: [
-      {
-        size: {
-          type: String,
-          required: false,
-        },
-        color: {
-          type: String,
-          required: false,
-        },
-        stock: {
-          type: Number,
-          required: false,
-          min: 0,
-        },
-      },
-    ],
+    currentOffer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Offer'
+  },
+  discountedPrice: {
+      type: Number,
+      default: function() {
+          return this.salePrice;
+      }
+  },
+
+  variants: [{
+    size: String,
+    color: String,
+    stock: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+  }],
   },
   {
     timestamps: true, 

@@ -1,5 +1,3 @@
-
-
 import mongoose from "mongoose";
 
 const categorySchema = new mongoose.Schema(
@@ -7,35 +5,33 @@ const categorySchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true, // Removes whitespace from both ends
+      trim: true, 
     },
     description: {
       type: String,
       required: true,
     },
     image: {
-      public_id: {
-        type: String,
-        required: false, // Explicitly marking it as optional
-      },
-      url: {
-        type: String,
-        required: false,
-      },
+      public_id: String,
+      url: String,
     },
     isActive: {
       type: Boolean,
-      default: true, // Default value is true
+      default: true,
     },
     isDeleted: {
       type: Boolean,
-      default: false, // Default value is false
+      default: false, 
+    },
+    currentOffer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Offer'
     },
   },
   {
-    timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
+    timestamps: true, 
   }
 );
 
-const Category = mongoose.model("Category", categorySchema); // Correct model name capitalization
+const Category = mongoose.model("Category", categorySchema); 
 export default Category;

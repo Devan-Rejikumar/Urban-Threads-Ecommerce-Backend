@@ -20,7 +20,8 @@ import adminOrderRoutes from './routes/adminOrderRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
-
+import offerRoutes from './routes/offerRoutes.js';
+import { Category, Product, Offer} from './models/Index.js';
 
 
 
@@ -98,6 +99,7 @@ app.use('/api', adminOrderRoutes);
 app.use('/api', couponRoutes);  
 app.use('/api/payment', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/admin/offers', offerRoutes);
 
 
 
