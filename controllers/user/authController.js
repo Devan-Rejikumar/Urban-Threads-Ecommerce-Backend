@@ -17,7 +17,6 @@ const pendingRegistrations = new Map();
 
 const createTransporter = async () => {
     try {
-        console.log('Setting up email transporter with user:', process.env.EMAIL_USER);
 
 
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
@@ -874,8 +873,6 @@ const advancedSearch = async (req, res) => {
             category: product.category?.name || '',
             thumbnail: product.images[0] || ''
         }));
-
-        console.log('Found products:', transformedProducts);
 
         res.json(transformedProducts);
     } catch (error) {

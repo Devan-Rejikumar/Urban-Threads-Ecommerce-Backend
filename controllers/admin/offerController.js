@@ -17,7 +17,6 @@ export const createOffer = async (req, res) => {
             maxDiscountAmount
         } = req.body;
 
-        // Check if target exists
         const Model = applicableType === 'product' ? Product : Category;
         const target = await Model.findById(applicableId);
         
@@ -28,7 +27,7 @@ export const createOffer = async (req, res) => {
             });
         }
 
-        // Check for existing active offer
+        
         const existingOffer = await Offer.findOne({
             applicableType,
             applicableId,
@@ -58,7 +57,7 @@ export const createOffer = async (req, res) => {
 
         await offer.save();
 
-        // Update product/category with offer reference
+     
         await Model.findByIdAndUpdate(applicableId, {
             $set: { currentOffer: offer._id }
         });
@@ -79,10 +78,7 @@ export const createOffer = async (req, res) => {
 
 export const getOffers = async (req, res) => {
     try {
-        console.log('kkkkkkkkk  ')
         const offers = await Offer.find()
-        
-            console.log("jjjjjjggggg",offers)
 
         res.status(200).json({
             success: true,

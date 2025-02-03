@@ -37,11 +37,11 @@ const addToWishlist = async (req, res) => {
             await wishlist.save();
         }
 
-        // Populate and return just the products array
+
         const populatedWishlist = await Wishlist.findOne({ user: req.user.id })
             .populate('products');
 
-        res.json(populatedWishlist.products); // Send just the products array
+        res.json(populatedWishlist.products); 
     } catch (error) {
         res.status(500).json({ error: 'Error adding to wishlist' });
     }

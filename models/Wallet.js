@@ -13,7 +13,7 @@ const walletTransactionSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['order_refund', 'razorpay', 'wallet_payment'],
+    enum: ['order_refund', 'razorpay', 'wallet_payment','order_payment'],
     required: true
   },
   orderId: {
@@ -27,7 +27,7 @@ const walletTransactionSchema = new mongoose.Schema({
   description: String,
   status: {
     type: String,
-    enum: ['pending', 'completed', 'failed'],
+    enum: ['pending', 'completed', 'failed','paid'],
     default: 'pending'
   },
   balance: {

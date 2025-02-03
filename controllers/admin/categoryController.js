@@ -1,6 +1,7 @@
 
 import Category from "../../models/Category.js";
 import { v2 as cloudinary } from 'cloudinary';
+import Product from "../../models/Products.js";
 
 const uploadBase64ImageToCloudinary = async (base64Image) => {
     try {
@@ -15,7 +16,7 @@ const uploadBase64ImageToCloudinary = async (base64Image) => {
       return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { 
-            resource_type: 'auto',      // Allow any file type
+            resource_type: 'auto',      
             folder: 'categories',
             width: 800,
             height: 800,
@@ -42,7 +43,7 @@ const uploadBase64ImageToCloudinary = async (base64Image) => {
           }
         );
   
-        // Handle upload stream errors
+
         uploadStream.on('error', (error) => {
           console.error("Upload stream error:", error);
           reject(error);
@@ -55,9 +56,13 @@ const uploadBase64ImageToCloudinary = async (base64Image) => {
       throw error;
     }
   };
+
+
 const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find({ isDeleted: false });
+    const categories = await Category.find({ isDeleted: false })
+      .populate('currentOffer')
+      console.log("Categories with offers:", JSON.stringify(categories, null, 2))
     res.status(200).json(categories);
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -65,24 +70,25 @@ const getCategories = async (req, res) => {
   }
 };
 
+
 const addCategories = async (req, res) => {
   try {
     const { name, description } = req.body;
-    const image = req.body.image; // Expecting base64 image string
+    const image = req.body.image; 
 
     if (!name || !description) {
       return res.status(400).json({ message: "Name and description must be provided" });
     }
 
     if (image) {
-        const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-        const sizeInKB = (base64Data.length * 0.75) / 1024;
-        console.log(`Processing image of size: ${Math.round(sizeInKB)}KB`);
-      }
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+      const sizeInKB = (base64Data.length * 0.75) / 1024;
+      console.log(`Processing image of size: ${Math.round(sizeInKB)}KB`);
+    }
 
     const normalizedName = name.toLowerCase().trim().replace(/\s+/g, ' ');
 
-    // Check for existing category
+   
     const existingCategory = await Category.findOne({
       name: { $regex: new RegExp(`^${normalizedName}$`, 'i') },
       isDeleted: false
@@ -92,7 +98,7 @@ const addCategories = async (req, res) => {
       return res.status(400).json({ message: "A category with this name already exists" });
     }
 
-    // Upload image if provided
+  
     let imageData = {};
     if (image) {
       try {
@@ -116,7 +122,8 @@ const addCategories = async (req, res) => {
       name,
       description,
       image: imageData,
-      isActive: true
+      isActive: true,
+      currentOffer: null 
     });
 
     await category.save();
@@ -133,11 +140,12 @@ const addCategories = async (req, res) => {
   }
 };
 
+
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, isActive } = req.body;
-    const image = req.body.image; // Expecting base64 image string
+    const { name, description, isActive, currentOffer } = req.body;
+    const image = req.body.image;
 
     const category = await Category.findById(id);
     if (!category) {
@@ -157,14 +165,12 @@ const updateCategory = async (req, res) => {
       }
     }
 
-    // Handle image update
+
     if (image) {
-      // Delete old image from Cloudinary if exists
       if (category.image?.public_id) {
         await cloudinary.uploader.destroy(category.image.public_id);
       }
       
-      // Upload new image
       try {
         const imageData = await uploadBase64ImageToCloudinary(image);
         category.image = imageData;
@@ -174,18 +180,44 @@ const updateCategory = async (req, res) => {
       }
     }
 
-    // Update other fields
+  
     if (name) category.name = name;
     if (description) category.description = description;
     if (typeof isActive !== 'undefined') category.isActive = isActive;
+    if (typeof currentOffer !== 'undefined') category.currentOffer = currentOffer;
 
     await category.save();
-    res.status(200).json(category);
+    
+  
+    const updatedCategory = await Category.findById(id).populate('currentOffer');
+    res.status(200).json(updatedCategory);
   } catch (error) {
     console.error('Error in updateCategory:', error);
     res.status(500).json({ message: "Error updating category", error: error.message });
   }
 };
+
+const updateCategoryOffer = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const { offerId } = req.body;
+
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    category.currentOffer = offerId;
+    await category.save();
+
+    const updatedCategory = await Category.findById(categoryId).populate('currentOffer');
+    res.status(200).json(updatedCategory);
+  } catch (error) {
+    console.error('Error updating category offer:', error);
+    res.status(500).json({ message: "Error updating category offer", error: error.message });
+  }
+};
+
 
 const deleteCategory = async (req, res) => {
   try {
@@ -196,7 +228,7 @@ const deleteCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    // Delete image from Cloudinary if exists
+  
     if (category.image?.public_id) {
       await cloudinary.uploader.destroy(category.image.public_id);
     }
@@ -233,10 +265,49 @@ const inactivateCategory = async (req, res) => {
   }
 };
 
+const getProductsByCategory = async(req,res) => {
+  try {
+    const { categoryId } = req.params;
+    
+    const category = await Category.findById(categoryId)
+      .populate('currentOffer');
+    
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: 'Category not found'
+      });
+    }
+
+    const products = await Product.find({
+      category: categoryId,
+      isDeleted: { $ne: true }, // Not deleted products
+      isActive: true
+    }).populate(['currentOffer', 'category']);
+
+    console.log(`Found ${products.length} products for category ${categoryId}`);
+
+    res.status(200).json({
+      success: true,
+      category,
+      products
+    });
+  } catch (error) {
+    console.error('Error in getProductsByCategory:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching category products',
+      error: error.message
+    });
+  }
+};
+
 export { 
   getCategories, 
   addCategories, 
   updateCategory, 
   deleteCategory, 
-  inactivateCategory 
+  inactivateCategory,
+  updateCategoryOffer,
+  getProductsByCategory
 };

@@ -7,17 +7,61 @@ export const createOrder = async (req, res) => {
     const { addressId, paymentMethod, items, totalAmount } = req.body;
     const userId = req.user.id;
 
+
+    if (!addressId || !paymentMethod || !items || !totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields',
+      });
+    }
+
+  
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Items must be a non-empty array',
+      });
+    }
+
+
+    if (paymentMethod === 'wallet') {
+      const wallet = await Wallet.findOne({ userId });
+
+      if (!wallet || wallet.balance < totalAmount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient wallet balance',
+        });
+      }
+
+      
+      wallet.balance -= totalAmount;
+      wallet.transactions.push({
+        amount: totalAmount,
+        type: 'debit',
+        source: 'wallet_payment',
+        description: `Payment for order`,
+        status: 'completed',
+        balance: wallet.balance,
+      });
+
+      await wallet.save();
+    }
+
+  
     const newOrder = new Order({
       userId,
       addressId,
       paymentMethod,
       items,
       totalAmount,
+      status: 'pending',
+      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending', 
     });
 
     await newOrder.save();
 
-    // Clear the user's cart after successful order
+   
     await Cart.findOneAndUpdate(
       { userId },
       { items: [], totalAmount: 0 }
@@ -29,10 +73,19 @@ export const createOrder = async (req, res) => {
       orderId: newOrder.orderId,
     });
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('Error creating orderrrrrrrrrrrrrrrr:', error);
+
+    
+    console.error('Full error details:', {
+      message: error.message,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+
     res.status(500).json({
       success: false,
       message: 'Failed to create order',
+      error: error.message, 
     });
   }
 };
@@ -47,12 +100,11 @@ export const getOrders = async (req, res) => {
 
     let query = { userId };
 
-    // Add status filter if not 'All'
+   
     if (status !== 'All') {
       query.status = status.toLowerCase();
     }
 
-    // Add search query if present
     if (search) {
       query = {
         ...query,
@@ -143,7 +195,6 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
-    // Only allow cancellation of pending orders
     if (order.status !== 'pending') {
       return res.status(400).json({
         success: false,
@@ -151,13 +202,17 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
-    if (order.paymentMethod === 'online') {
+
+    if (order.paymentMethod === 'online' || order.paymentMethod === 'wallet') {
       const refundAmount = order.totalAmount;
 
       let wallet = await Wallet.findOne({ userId });
       if (!wallet) {
         wallet = new Wallet({ userId, balance: 0, transactions: [] });
       }
+
+      
+      wallet.balance += refundAmount;
       wallet.transactions.push({
         amount: refundAmount,
         type: 'credit',
@@ -165,23 +220,27 @@ export const cancelOrder = async (req, res) => {
         orderId: order.orderId,
         description: `Refund for cancelled order ${order.orderId}`,
         status: 'completed',
-        balance: wallet.balance + refundAmount
-
+        balance: wallet.balance
       });
 
+      await wallet.save();
+
+     
       order.refundStatus = 'processed';
       order.refundAmount = refundAmount;
     }
+
+    
     order.status = 'cancelled';
     order.cancellationReason = reason;
 
-    // Update all items to cancelled status
+   
     order.items = order.items.map(item => ({
       ...item.toObject(),
       status: 'cancelled',
       cancellationReason: reason,
-      refundStatus: order.paymentMethod === 'online' ? 'processed' : 'not_applicable',
-      refundAmount: order.paymentMethod === 'online' ? (item.price * item.quantity) : 0
+      refundStatus: (order.paymentMethod === 'online' || order.paymentMethod === 'wallet') ? 'processed' : 'not_applicable',
+      refundAmount: (order.paymentMethod === 'online' || order.paymentMethod === 'wallet') ? (item.price * item.quantity) : 0
     }));
 
     await order.save();
@@ -189,7 +248,8 @@ export const cancelOrder = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Order cancelled successfully',
-      order
+      order,
+      refundProcessed: (order.paymentMethod === 'online' || order.paymentMethod === 'wallet')
     });
 
   } catch (error) {
@@ -230,16 +290,18 @@ export const cancelOrderItem = async (req, res) => {
         message: 'Item is already cancelled'
       });
     }
-    if (order.paymentMethod === 'online') {
+
+ 
+    if (order.paymentMethod === 'online' || order.paymentMethod === 'wallet') {
       const refundAmount = item.price * item.quantity;
 
-      // Find or create wallet
       let wallet = await Wallet.findOne({ userId });
       if (!wallet) {
         wallet = new Wallet({ userId, balance: 0, transactions: [] });
       }
 
-      // Add refund transaction to wallet
+      
+      wallet.balance += refundAmount;
       wallet.transactions.push({
         amount: refundAmount,
         type: 'credit',
@@ -247,23 +309,20 @@ export const cancelOrderItem = async (req, res) => {
         orderId: order.orderId,
         description: `Refund for cancelled item in order ${order.orderId}`,
         status: 'completed',
-        balance: wallet.balance + refundAmount
+        balance: wallet.balance
       });
 
-      // Update wallet balance
-      wallet.balance += refundAmount;
       await wallet.save();
 
-      // Update item refund status
       item.refundStatus = 'processed';
       item.refundAmount = refundAmount;
     }
 
-    // Update item status and reason
+    
     item.status = 'cancelled';
     item.cancellationReason = reason;
 
-    // Update order status based on items status
+   
     if (order.items.every((i) => i.status === 'cancelled')) {
       order.status = 'cancelled';
     } else if (order.items.some((i) => i.status === 'processing')) {
@@ -276,7 +335,7 @@ export const cancelOrderItem = async (req, res) => {
       order.status = 'returned';
     }
 
-    // Recalculate total amount excluding cancelled items
+   
     order.totalAmount = order.items.reduce((total, item) => {
       return item.status !== 'cancelled' ? total + (item.price * item.quantity) : total;
     }, 0);

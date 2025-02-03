@@ -2,14 +2,15 @@
 import mongoose from "mongoose";
 import Category from "../../models/Category.js";
 import Product from "../../models/Products.js";
+import Offer from "../../models/Offer.js"
+
 import { v2 as cloudinary } from 'cloudinary';
 
 
 const getProducts = async (req, res) => {
     try {
-        console.log('getproducts')
+       
         const products = await Product.find().populate('category', 'name');  
-        console.log(products)
         if (!products || products.length === 0) {
             return res.status(404).json({ error: "No products found asdfghj" });
         }
@@ -56,12 +57,6 @@ const uploadBase64ImagesToCloudinary = async (base64Images) => {
     try {
       const { name, category, description, variants, images, originalPrice, salePrice } = req.body;
 
-      console.log('Received product data:', {
-        name: req.body.name,
-        category: req.body.category,
-        isListed: req.body.isListed
-      });
-  
       // Parse variants if it's a string
       let parsedVariants;
       try {
@@ -119,7 +114,6 @@ const getCategories = async(req,res)=>{
         const categories = await Category.find()
         return res.status(200).json(categories)
     } catch (error) {
-        console.log('getcategories',error)
         res.status(400).json('something went wrong')
     }
 }
@@ -263,25 +257,21 @@ const toggleProductListing = async (req, res) => {
 const getProductsByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
-    console.log('Searching for category:', categoryId);
 
     const category = await Category.findOne({
       _id: categoryId,
       isActive: true,
       isDeleted: false
     });
-    console.log('Found category:', category);
 
     const query = {
       category: new mongoose.Types.ObjectId(categoryId),
       isListed: true,
       isDeleted: false
     };
-    console.log('Product search query:', query);
 
     const products = await Product.find(query)
   .select('name originalPrice salePrice images'); // Add this line
-    console.log('Raw products found:', products);
 
     res.status(200).json({ category, products });
   } catch (error) {
@@ -293,12 +283,12 @@ const getProductsByCategory = async (req, res) => {
 const getProductById = async (req, res) => {
   try {
     const { productId } = req.params;
-    
+
     const product = await Product.findOne({
       _id: productId,
       isListed: true,
       isDeleted: false
-    }).select('name originalPrice salePrice images description variants rating reviews');
+    }).select('name originalPrice salePrice category images description variants rating reviews');
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });

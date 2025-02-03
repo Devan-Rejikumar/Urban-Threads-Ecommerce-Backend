@@ -7,10 +7,19 @@ const orderItemSchema = new mongoose.Schema({
     selectedSize: { type: String, required: true },
     status: {
         type: String,
-        enum: ['pending', 'cancelled'],
+        enum: ['pending', 'cancelled','shipped', 'delivered', 'cancelled', 'returned'],
         default: 'pending'
     },
-    cancellationReason: String
+    cancellationReason: String,
+    refundStatus : {
+      type : String,
+      enum : ['pending','processed','failed','not_applicable'],
+      default : 'not_applicable'
+    },
+    refundAmount : {
+      type : Number,
+      default : 0
+    }
 });
 
 const orderSchema = new mongoose.Schema(
@@ -21,7 +30,8 @@ const orderSchema = new mongoose.Schema(
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'User',
+      required: true
     },
     addressId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -44,6 +44,10 @@ const productSchema = new mongoose.Schema(
           return this.salePrice;
       }
   },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
 
   variants: [{
     size: String,
