@@ -1,10 +1,18 @@
+
 import Order from '../models/Order.js';
 import Cart from '../models/Cart.js';
 import Wallet from '../models/Wallet.js';
+import Coupon from '../models/Coupons.js';
+import PDFDocument from 'pdfkit';
 
 export const createOrder = async (req, res) => {
   try {
-    const { addressId, paymentMethod, items, totalAmount } = req.body;
+    const { addressId, paymentMethod, items, totalAmount, discountAmount, couponCode, paymentStatus } = req.body;
+    console.log('Order Creation Dataaaaaaaaaaaaaa:', {
+      totalAmount,
+      discountAmount,
+      couponCode
+    });
     const userId = req.user.id;
 
 
@@ -15,12 +23,38 @@ export const createOrder = async (req, res) => {
       });
     }
 
-  
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Items must be a non-empty array',
       });
+    }
+
+    if (discountAmount) {
+      if (discountAmount < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount amount cannot be negative',
+        });
+      }
+      if (discountAmount > totalAmount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount cannot exceed total amount',
+        });
+      }
+    }
+
+
+    if (couponCode) {
+      const coupon = await Coupon.findOne({ code: couponCode });
+      if (!coupon) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid coupon code',
+        });
+      }
     }
 
 
@@ -34,7 +68,7 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      
+
       wallet.balance -= totalAmount;
       wallet.transactions.push({
         amount: totalAmount,
@@ -48,24 +82,60 @@ export const createOrder = async (req, res) => {
       await wallet.save();
     }
 
-  
+    let initialStatus = 'pending';
+    let initialPaymentStatus = 'pending';
+
+    if (paymentMethod === 'online') {
+      // For online payments, check the payment status
+      if (paymentStatus === 'failed') {
+        initialStatus = 'payment_failed';  // Set order status to payment_failed
+        initialPaymentStatus = 'failed';
+      }
+    } else if (paymentMethod === 'wallet') {
+      initialPaymentStatus = 'paid';
+    }
+
+
     const newOrder = new Order({
       userId,
       addressId,
       paymentMethod,
       items,
       totalAmount,
-      status: 'pending',
-      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending', 
+      status: initialStatus,
+      discountAmount: discountAmount || 0,
+      couponUsed: couponCode || null,
+      // paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending',
+      paymentStatus: initialPaymentStatus,
     });
+
+    console.log('New Order Objectttttttttttttttttttt:', {
+      totalAmount: newOrder.totalAmount,
+      discountAmount: newOrder.discountAmount,
+      couponUsed: newOrder.couponUsed
+    });
+
+    if (initialStatus === 'payment_failed') {
+      newOrder.items = newOrder.items.map(item => ({
+        ...item,
+        status: 'payment_failed'
+      }));
+    }
 
     await newOrder.save();
 
-   
+
     await Cart.findOneAndUpdate(
       { userId },
-      { items: [], totalAmount: 0 }
+      { items: [], totalAmount: 0, discount: 0, couponCode: null }
     );
+
+    if (couponCode) {
+      await Coupon.findOneAndUpdate(
+        { code: couponCode },
+        { $inc: { usageCount: 1 } }
+      );
+    }
 
     res.status(201).json({
       success: true,
@@ -73,20 +143,14 @@ export const createOrder = async (req, res) => {
       orderId: newOrder.orderId,
     });
   } catch (error) {
-    console.error('Error creating orderrrrrrrrrrrrrrrr:', error);
-
-    
-    console.error('Full error details:', {
-      message: error.message,
-      stack: error.stack,
-      requestBody: req.body,
-    });
-
+    console.error('Error creating order:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create order',
-      error: error.message, 
+      error: error.message,
     });
+
+
   }
 };
 
@@ -100,7 +164,7 @@ export const getOrders = async (req, res) => {
 
     let query = { userId };
 
-   
+
     if (status !== 'All') {
       query.status = status.toLowerCase();
     }
@@ -211,7 +275,7 @@ export const cancelOrder = async (req, res) => {
         wallet = new Wallet({ userId, balance: 0, transactions: [] });
       }
 
-      
+
       wallet.balance += refundAmount;
       wallet.transactions.push({
         amount: refundAmount,
@@ -225,16 +289,16 @@ export const cancelOrder = async (req, res) => {
 
       await wallet.save();
 
-     
+
       order.refundStatus = 'processed';
       order.refundAmount = refundAmount;
     }
 
-    
+
     order.status = 'cancelled';
     order.cancellationReason = reason;
 
-   
+
     order.items = order.items.map(item => ({
       ...item.toObject(),
       status: 'cancelled',
@@ -291,7 +355,7 @@ export const cancelOrderItem = async (req, res) => {
       });
     }
 
- 
+
     if (order.paymentMethod === 'online' || order.paymentMethod === 'wallet') {
       const refundAmount = item.price * item.quantity;
 
@@ -300,7 +364,7 @@ export const cancelOrderItem = async (req, res) => {
         wallet = new Wallet({ userId, balance: 0, transactions: [] });
       }
 
-      
+
       wallet.balance += refundAmount;
       wallet.transactions.push({
         amount: refundAmount,
@@ -318,11 +382,11 @@ export const cancelOrderItem = async (req, res) => {
       item.refundAmount = refundAmount;
     }
 
-    
+
     item.status = 'cancelled';
     item.cancellationReason = reason;
 
-   
+
     if (order.items.every((i) => i.status === 'cancelled')) {
       order.status = 'cancelled';
     } else if (order.items.some((i) => i.status === 'processing')) {
@@ -335,7 +399,7 @@ export const cancelOrderItem = async (req, res) => {
       order.status = 'returned';
     }
 
-   
+
     order.totalAmount = order.items.reduce((total, item) => {
       return item.status !== 'cancelled' ? total + (item.price * item.quantity) : total;
     }, 0);
@@ -347,7 +411,7 @@ export const cancelOrderItem = async (req, res) => {
       message: 'Item cancelled successfully',
       order
     });
-    
+
   } catch (error) {
     console.error('Error cancelling order item:', error);
     res.status(500).json({
@@ -356,3 +420,193 @@ export const cancelOrderItem = async (req, res) => {
     });
   }
 };
+
+export const generateInvoice = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findOne({ orderId })
+      .populate('items.productId')
+      .populate('addressId');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    // Create a new PDF document
+    const doc = new PDFDocument();
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${orderId}.pdf`);
+
+    // Pipe the PDF document to the response
+    doc.pipe(res);
+
+    // Add content to the PDF
+    doc.fontSize(20).text('Invoice', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Order ID: ${order.orderId}`);
+    doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
+    doc.moveDown();
+
+    // Add shipping address
+    doc.fontSize(14).text('Shipping Address');
+    doc.fontSize(12).text(`${order.addressId.firstName} ${order.addressId.lastName}`);
+    doc.text(order.addressId.streetAddress);
+    doc.text(`${order.addressId.city}, ${order.addressId.state} ${order.addressId.pincode}`);
+    doc.text(`Phone: ${order.addressId.phoneNumber}`);
+    doc.moveDown();
+
+    // Add items
+    doc.fontSize(14).text('Items');
+    order.items.forEach(item => {
+      doc.fontSize(12).text(`${item.productId.name} - ${item.selectedSize}`);
+      doc.text(`Quantity: ${item.quantity} x ₹${item.price} = ₹${item.quantity * item.price}`);
+      doc.moveDown(0.5);
+    });
+
+    doc.moveDown();
+    doc.fontSize(14).text(`Total Amount: ₹${order.totalAmount}`, { align: 'right' });
+
+    // Finalize the PDF
+    doc.end();
+
+  } catch (error) {
+    console.error('Error generating invoice:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error generating invoice',
+    });
+  }
+};
+
+export const returnItem = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason, itemId } = req.body;
+    const userId = req.user.id;
+
+    const order = await Order.findOne({ orderId, userId })
+      .populate('items.productId');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'delivered') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only delivered orders can be returned',
+      });
+    }
+
+    // Find the specific item if itemId is provided
+    const item = itemId ? order.items.find(item => item._id.toString() === itemId) : order.items[0];
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found in order',
+      });
+    }
+
+    if (item.status === 'returned') {
+      return res.status(400).json({
+        success: false,
+        message: 'Item has already been returned',
+      });
+    }
+
+    // Calculate refund amount for the item
+    let refundAmount;
+    if (itemId) {
+      // For single item return, calculate its proportion of the total paid amount
+      const itemTotal = item.price * item.quantity;
+      const orderTotal = order.items.reduce((total, i) => total + (i.price * i.quantity), 0);
+      const proportion = itemTotal / orderTotal;
+      refundAmount = Math.round(order.totalAmount * proportion);
+    } else {
+      refundAmount = order.totalAmount;
+    }
+
+    // Ensure refundAmount is a valid number
+    if (isNaN(refundAmount) || refundAmount < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid refund amount calculated'
+      });
+    }
+
+    // Update item status
+    if (itemId) {
+      item.status = 'returned';
+      item.refundStatus = 'processed';
+      item.refundAmount = refundAmount;
+    } else {
+      // Update all items if no specific item is provided
+      order.items.forEach(item => {
+        item.status = 'returned';
+        item.refundStatus = 'processed';
+        item.refundAmount = item.price * item.quantity;
+      });
+      order.status = 'returned';
+      order.returnReason = reason;
+      order.returnDate = new Date();
+    }
+
+    // Credit amount to wallet
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      // Create wallet if it doesn't exist
+      const newWallet = new Wallet({
+        userId,
+        balance: refundAmount,
+        transactions: [{
+          amount: refundAmount,
+          type: 'credit',
+          source: 'order_refund',
+          description: `Refund for order ${orderId}${itemId ? ' (item return)' : ''}`,
+          status: 'completed',
+          balance: refundAmount
+        }]
+      });
+      await newWallet.save();
+    } else {
+      // Update existing wallet
+      wallet.balance += refundAmount;
+      wallet.transactions.push({
+        amount: refundAmount,
+        type: 'credit',
+        source: 'order_refund',
+        description: `Refund for order ${orderId}${itemId ? ' (item return)' : ''}`,
+        status: 'completed',
+        balance: wallet.balance
+      });
+      await wallet.save();
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Return processed successfully',
+      order,
+      walletCredit: refundAmount
+    });
+
+  } catch (error) {
+    console.error('Error processing return:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing return',
+      error: error.message
+    });
+  }
+};
+

@@ -21,6 +21,8 @@ import couponRoutes from './routes/couponRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
+import salesReportRoutes from './routes/salesReport.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 import { Category, Product, Offer} from './models/Index.js';
 
 
@@ -35,15 +37,12 @@ app.use(cookieParser());
 app.use(express.urlencoded({ extended: true, limit : '50mb' }));
 app.use(express.json({limit : '50mb'}));
 
-
-
-
-
 const corsOptions = {
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -55,20 +54,6 @@ app.use((req, res, next) => {
   );
   next();
 });
-
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
-  res.header('Access-Control-Allow-Credentials', true);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
@@ -100,8 +85,8 @@ app.use('/api', couponRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/admin/offers', offerRoutes);
-
-
+app.use('/api/admin/reports', salesReportRoutes);
+app.use('/api/admin/dashboard', dashboardRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

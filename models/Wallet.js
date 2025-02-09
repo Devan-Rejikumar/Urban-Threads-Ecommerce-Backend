@@ -13,7 +13,7 @@ const walletTransactionSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['order_refund', 'razorpay', 'wallet_payment','order_payment'],
+    enum: ['order_refund', 'razorpay', 'wallet_payment', 'order_payment', 'return_refund'],
     required: true
   },
   orderId: {

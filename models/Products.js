@@ -34,37 +34,28 @@ const productSchema = new mongoose.Schema(
     description: {
       type: String,
     },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
     currentOffer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Offer'
-  },
-  discountedPrice: {
-      type: Number,
-      default: function() {
-          return this.salePrice;
-      }
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-
-  variants: [{
-    size: String,
-    color: String,
-    stock: {
-      type: Number,
-      min: 0,
-      default: 0
     },
-  }],
+    variants: [{
+      size: String,
+      color: String,
+      stock: {
+        type: Number,
+        min: 0,
+        default: 0
+      },
+    }],
   },
   {
     timestamps: true, 
-  },
-  
+  }
 );
 
 const Product = mongoose.model("Product", productSchema);
-
 export default Product;

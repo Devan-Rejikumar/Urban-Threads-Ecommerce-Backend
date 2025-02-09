@@ -33,6 +33,12 @@ const CartSchema = new mongoose.Schema({
       required: true,
       default: 0
     },
+    shippingCharges: {
+      type: Number,
+      default: function() {
+        return this.totalAmount >= 1200 ? 0 : 100;
+      }
+    },
     couponCode: {
         type: String,
         default: null
@@ -44,13 +50,14 @@ const CartSchema = new mongoose.Schema({
     finalAmount: {
         type: Number,
         default: function() {
-            return this.totalAmount - (this.discount || 0);
+            return this.totalAmount - (this.discount || 0) + (this.shippingCharges || 0);
         }
     }
 }, { timestamps: true });
 
 CartSchema.pre('save', function(next) {
-    this.finalAmount = this.totalAmount - (this.discount || 0);
+    this.shippingCharges = this.totalAmount >= 1200 ? 0 : 100;
+    this.finalAmount = this.totalAmount - (this.discount || 0) + (this.shippingCharges || 0);
     next();
 });
 
