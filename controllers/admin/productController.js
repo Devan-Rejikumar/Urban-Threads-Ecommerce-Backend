@@ -6,14 +6,14 @@ import { v2 as cloudinary } from 'cloudinary';
 
 
 const priceCalculator = {
-  // Calculate discounted price based on an offer
+
   calculateDiscountedPrice: (originalPrice, offer) => {
     if (!offer || !offer.discountValue || originalPrice <= 0) return originalPrice;
     const discountedAmount = (originalPrice * offer.discountValue) / 100;
     return Math.max(0, originalPrice - discountedAmount);
   },
 
-  // Compare offers and return the best price
+
   getBestOfferPrice: (originalPrice, productOffer, categoryOffer) => {
     if (!productOffer && !categoryOffer) return originalPrice;
     
@@ -25,7 +25,7 @@ const priceCalculator = {
     return Math.min(productDiscountedPrice, categoryDiscountedPrice);
   },
 
-  // Update product prices based on category offer
+ 
   async updateCategoryProductPrices(categoryId, categoryOffer) {
     const products = await Product.find({ 
       category: categoryId,
@@ -76,21 +76,21 @@ const uploadBase64ImagesToCloudinary = async (base64Images) => {
             throw new Error(`Invalid image data for image ${index + 1}`);
           }
 
-          // Validate image format
+          
           if (!base64Image.startsWith('data:image/')) {
             throw new Error(`Invalid image format for image ${index + 1}`);
           }
 
           const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
           
-          // Validate base64 data
+          
           if (!base64Data) {
             throw new Error(`Empty image data for image ${index + 1}`);
           }
 
-          // Create buffer and check size
+    
           const buffer = Buffer.from(base64Data, 'base64');
-          if (buffer.length > 5 * 1024 * 1024) { // 5MB limit
+          if (buffer.length > 5 * 1024 * 1024) { 
             throw new Error(`Image ${index + 1} exceeds 5MB size limit`);
           }
 
@@ -98,10 +98,10 @@ const uploadBase64ImagesToCloudinary = async (base64Images) => {
             const uploadStream = cloudinary.uploader.upload_stream(
               { 
                 resource_type: 'image',
-                folder: 'urban-threads', // Organize images in a folder
+                folder: 'urban-threads', 
                 transformation: [
-                  { quality: 'auto:good' }, // Optimize image quality
-                  { fetch_format: 'auto' } // Auto-select best format
+                  { quality: 'auto:good' }, 
+                  { fetch_format: 'auto' } 
                 ]
               },
               (error, result) => {
@@ -112,7 +112,7 @@ const uploadBase64ImagesToCloudinary = async (base64Images) => {
               }
             );
 
-            // Handle potential stream errors
+          
             uploadStream.on('error', (error) => {
               reject(new Error(`Stream error for image ${index + 1}: ${error.message}`));
             });
@@ -135,7 +135,7 @@ const uploadBase64ImagesToCloudinary = async (base64Images) => {
     try {
       const { name, category, description, variants, images, originalPrice } = req.body;
   
-      // Validate and parse variants
+    
       let parsedVariants;
       try {
         parsedVariants = typeof variants === 'string' ? JSON.parse(variants) : variants;
@@ -152,7 +152,7 @@ const uploadBase64ImagesToCloudinary = async (base64Images) => {
         });
       }
 
-      // Parse and validate images
+     
       let parsedImages;
       try {
         parsedImages = typeof images === 'string' ? JSON.parse(images) : images;
@@ -298,9 +298,8 @@ const updateProduct = async (req, res) => {
       description: req.body.description,
       originalPrice: req.body.originalPrice,
       salePrice: req.body.salePrice,
-      variants: JSON.parse(req.body.variants || '[]')
+      variants: req.body.variants
     };
-
    
     if (req.files && req.files.length > 0) {
       productData.images = req.files.map(file => file.path);
@@ -333,7 +332,7 @@ const toggleProductListing = async (req, res) => {
       const { id } = req.params;
       const { isListed } = req.body;
 
-      // Validate that isListed is a boolean
+     
       if (typeof isListed !== 'boolean') {
           return res.status(400).json({ 
               message: 'isListed must be a boolean value' 
@@ -381,7 +380,7 @@ const getProductsByCategory = async (req, res) => {
     };
 
     const products = await Product.find(query)
-  .select('name originalPrice salePrice images'); // Add this line
+  .select('name originalPrice salePrice images'); 
 
     res.status(200).json({ category, products });
   } catch (error) {
@@ -431,4 +430,76 @@ const updateProductStock = async (productId,quantity) => {
   }
 }
 
-export { getProducts, addProduct, editProduct, softDeleteProduct, deleteProduct,getCategories , updateProduct, toggleProductListing, getProductsByCategory, getProductById, updateProductStock};
+const validateCartItems = async (req, res) => {
+  try {
+    const { items } = req.body;
+    const invalidItems = [];
+
+    // Validate each item in the cart
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      
+      if (!product) {
+        invalidItems.push({
+          productId: item.productId,
+          selectedSize: item.selectedSize,
+          name: "Product not found",
+          reason: "PRODUCT_NOT_FOUND"
+        });
+        continue;
+      }
+
+      // Check if product is active and not deleted
+      if (!product.isListed || product.isDeleted) {
+        invalidItems.push({
+          productId: item.productId,
+          selectedSize: item.selectedSize,
+          name: product.name,
+          reason: "PRODUCT_UNAVAILABLE"
+        });
+        continue;
+      }
+
+      // Find the specific variant
+      const variant = product.variants.find(v => v.size === item.selectedSize);
+      
+      if (!variant) {
+        invalidItems.push({
+          productId: item.productId,
+          selectedSize: item.selectedSize,
+          name: product.name,
+          reason: "SIZE_UNAVAILABLE"
+        });
+        continue;
+      }
+
+      // Check if requested quantity is available
+      if (variant.stock < item.quantity) {
+        invalidItems.push({
+          productId: item.productId,
+          selectedSize: item.selectedSize,
+          name: product.name,
+          reason: "INSUFFICIENT_STOCK",
+          availableStock: variant.stock
+        });
+        continue;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      invalidItems,
+      isValid: invalidItems.length === 0
+    });
+
+  } catch (error) {
+    console.error('Error validating cart items:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error validating cart items',
+      error: error.message
+    });
+  }
+};
+
+export { getProducts, addProduct, editProduct, softDeleteProduct, deleteProduct,getCategories , updateProduct, toggleProductListing, getProductsByCategory, getProductById, updateProductStock, validateCartItems};

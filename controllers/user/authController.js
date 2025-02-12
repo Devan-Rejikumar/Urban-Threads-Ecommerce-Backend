@@ -56,7 +56,7 @@ const createTransporter = async () => {
 
 const sendVerificationEmail = async (email, otp) => {
     try {
-        console.log('Attempting to send verification email to:', email);
+        console.log('Attempting to send verification email tosssssssssss:', email, otp);
         const transporter = await createTransporter();
 
         const mailOptions = {
@@ -128,6 +128,8 @@ const registerUser = async (req, res) => {
             .filter(([_, value]) => value)
             .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 
+            
+
         if (Object.keys(errors).length > 0) {
             return res.status(400).json({
                 message: 'Validation failed',
@@ -153,7 +155,7 @@ const registerUser = async (req, res) => {
                 email: email.toLowerCase(),
                 password: hashedPassword,
                 phone,
-                status: 'active'
+                status: 'unblocked'
             },
             otp,
             otpExpiry

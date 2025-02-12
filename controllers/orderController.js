@@ -227,7 +227,7 @@ export const getOrderDetails = async (req, res) => {
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found'
+        message: 'Order not foundsss'
       });
     }
 
@@ -425,60 +425,63 @@ export const generateInvoice = async (req, res) => {
   try {
     const { orderId } = req.params;
     const order = await Order.findOne({ orderId })
-      .populate('items.productId')
-      .populate('addressId');
+      .populate('userId')
+      .populate('addressId')
+      .populate('items.productId');
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found',
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
       });
     }
 
-    // Create a new PDF document
-    const doc = new PDFDocument();
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invoice is only available for delivered orders' 
+      });
+    }
 
-    // Set response headers
+  
+    const doc = new PDFDocument();
+    
+ 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=invoice-${orderId}.pdf`);
-
-    // Pipe the PDF document to the response
+    
+   
     doc.pipe(res);
-
-    // Add content to the PDF
+    
+  
     doc.fontSize(20).text('Invoice', { align: 'center' });
     doc.moveDown();
     doc.fontSize(12).text(`Order ID: ${order.orderId}`);
     doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
-    doc.moveDown();
-
-    // Add shipping address
-    doc.fontSize(14).text('Shipping Address');
-    doc.fontSize(12).text(`${order.addressId.firstName} ${order.addressId.lastName}`);
-    doc.text(order.addressId.streetAddress);
+    doc.text(`Name: ${order.addressId.firstName} ${order.addressId.lastName}`);
+    doc.text(`Address: ${order.addressId.streetAddress}`);
     doc.text(`${order.addressId.city}, ${order.addressId.state} ${order.addressId.pincode}`);
     doc.text(`Phone: ${order.addressId.phoneNumber}`);
     doc.moveDown();
+    
 
-    // Add items
-    doc.fontSize(14).text('Items');
+    doc.text('Items:', { underline: true });
     order.items.forEach(item => {
-      doc.fontSize(12).text(`${item.productId.name} - ${item.selectedSize}`);
+      doc.text(`${item.productId.name} - ${item.selectedSize}`);
       doc.text(`Quantity: ${item.quantity} x ₹${item.price} = ₹${item.quantity * item.price}`);
       doc.moveDown(0.5);
     });
-
+    
     doc.moveDown();
-    doc.fontSize(14).text(`Total Amount: ₹${order.totalAmount}`, { align: 'right' });
-
-    // Finalize the PDF
+    doc.text(`Total Amount: ₹${order.totalAmount}`, { bold: true });
+    
+  
     doc.end();
-
   } catch (error) {
     console.error('Error generating invoice:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error generating invoice',
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to generate invoice' 
     });
   }
 };
@@ -486,7 +489,7 @@ export const generateInvoice = async (req, res) => {
 export const returnItem = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { reason, itemId } = req.body;
+    const { reason } = req.body;
     const userId = req.user.id;
 
     const order = await Order.findOne({ orderId, userId })
@@ -495,118 +498,230 @@ export const returnItem = async (req, res) => {
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found',
+        message: 'Order not found'
       });
     }
 
     if (order.status !== 'delivered') {
       return res.status(400).json({
         success: false,
-        message: 'Only delivered orders can be returned',
+        message: 'Only delivered orders can be returned'
       });
     }
 
-    // Find the specific item if itemId is provided
-    const item = itemId ? order.items.find(item => item._id.toString() === itemId) : order.items[0];
+   
+    const deliveryDate = new Date(order.deliveredAt || order.updatedAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - deliveryDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (!item) {
-      return res.status(404).json({
-        success: false,
-        message: 'Item not found in order',
-      });
-    }
-
-    if (item.status === 'returned') {
+    if (diffDays > 7) {
       return res.status(400).json({
         success: false,
-        message: 'Item has already been returned',
+        message: 'Return period has expired (7 days from delivery)'
       });
     }
 
-    // Calculate refund amount for the item
-    let refundAmount;
-    if (itemId) {
-      // For single item return, calculate its proportion of the total paid amount
-      const itemTotal = item.price * item.quantity;
-      const orderTotal = order.items.reduce((total, i) => total + (i.price * i.quantity), 0);
-      const proportion = itemTotal / orderTotal;
-      refundAmount = Math.round(order.totalAmount * proportion);
-    } else {
-      refundAmount = order.totalAmount;
-    }
-
-    // Ensure refundAmount is a valid number
-    if (isNaN(refundAmount) || refundAmount < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid refund amount calculated'
-      });
-    }
-
-    // Update item status
-    if (itemId) {
-      item.status = 'returned';
-      item.refundStatus = 'processed';
-      item.refundAmount = refundAmount;
-    } else {
-      // Update all items if no specific item is provided
-      order.items.forEach(item => {
-        item.status = 'returned';
-        item.refundStatus = 'processed';
-        item.refundAmount = item.price * item.quantity;
-      });
-      order.status = 'returned';
-      order.returnReason = reason;
-      order.returnDate = new Date();
-    }
-
-    // Credit amount to wallet
-    const wallet = await Wallet.findOne({ userId });
-    if (!wallet) {
-      // Create wallet if it doesn't exist
-      const newWallet = new Wallet({
-        userId,
-        balance: refundAmount,
-        transactions: [{
-          amount: refundAmount,
-          type: 'credit',
-          source: 'order_refund',
-          description: `Refund for order ${orderId}${itemId ? ' (item return)' : ''}`,
-          status: 'completed',
-          balance: refundAmount
-        }]
-      });
-      await newWallet.save();
-    } else {
-      // Update existing wallet
-      wallet.balance += refundAmount;
-      wallet.transactions.push({
-        amount: refundAmount,
-        type: 'credit',
-        source: 'order_refund',
-        description: `Refund for order ${orderId}${itemId ? ' (item return)' : ''}`,
-        status: 'completed',
-        balance: wallet.balance
-      });
-      await wallet.save();
-    }
+   
+    order.status = 'return_requested';
+    order.returnReason = reason;
+    order.returnRequestedAt = new Date();
 
     await order.save();
 
     res.json({
       success: true,
-      message: 'Return processed successfully',
-      order,
-      walletCredit: refundAmount
+      message: 'Return request submitted successfully. Awaiting admin approval.',
+      order
     });
 
   } catch (error) {
-    console.error('Error processing return:', error);
+    console.error('Error processing return request:', error);
     res.status(500).json({
       success: false,
-      message: 'Error processing return',
+      message: 'Error processing return request',
       error: error.message
     });
   }
 };
+
+// export const returnItem = async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+//     const { reason, itemId } = req.body;
+//     const userId = req.user.id;
+
+//     const order = await Order.findOne({ orderId, userId })
+//       .populate('items.productId');
+
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Order not found',
+//       });
+//     }
+
+//     if (order.status !== 'delivered') {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Only delivered orders can be returned',
+//       });
+//     }
+
+//     const item = itemId ? order.items.find(item => item._id.toString() === itemId) : order.items[0];
+
+//     if (!item) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Item not found in order',
+//       });
+//     }
+
+//     if (item.status === 'returned') {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Item has already been returned',
+//       });
+//     }
+
+ 
+//     let refundAmount;
+//     if (itemId) {
+
+//       const itemTotal = item.price * item.quantity;
+//       const orderTotal = order.items.reduce((total, i) => total + (i.price * i.quantity), 0);
+//       const proportion = itemTotal / orderTotal;
+//       refundAmount = Math.round(order.totalAmount * proportion);
+//     } else {
+//       refundAmount = order.totalAmount;
+//     }
+
+//     if (isNaN(refundAmount) || refundAmount < 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid refund amount calculated'
+//       });
+//     }
+
+ 
+//     if (itemId) {
+//       item.status = 'returned';
+//       item.refundStatus = 'processed';
+//       item.refundAmount = refundAmount;
+//     } else {
+     
+//       order.items.forEach(item => {
+//         item.status = 'returned';
+//         item.refundStatus = 'processed';
+//         item.refundAmount = item.price * item.quantity;
+//       });
+//       order.status = 'returned';
+//       order.returnReason = reason;
+//       order.returnDate = new Date();
+//     }
+
+ 
+//     const wallet = await Wallet.findOne({ userId });
+//     if (!wallet) {
+      
+//       const newWallet = new Wallet({
+//         userId,
+//         balance: refundAmount,
+//         transactions: [{
+//           amount: refundAmount,
+//           type: 'credit',
+//           source: 'order_refund',
+//           description: `Refund for order ${orderId}${itemId ? ' (item return)' : ''}`,
+//           status: 'completed',
+//           balance: refundAmount
+//         }]
+//       });
+//       await newWallet.save();
+//     } else {
+    
+//       wallet.balance += refundAmount;
+//       wallet.transactions.push({
+//         amount: refundAmount,
+//         type: 'credit',
+//         source: 'order_refund',
+//         description: `Refund for order ${orderId}${itemId ? ' (item return)' : ''}`,
+//         status: 'completed',
+//         balance: wallet.balance
+//       });
+//       await wallet.save();
+//     }
+
+//     await order.save();
+
+//     res.json({
+//       success: true,
+//       message: 'Return processed successfully',
+//       order,
+//       walletCredit: refundAmount
+//     });
+
+//   } catch (error) {
+//     console.error('Error processing return:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error processing return',
+//       error: error.message
+//     });
+//   }
+// };
+
+export const requestReturn = async (req,res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const userId = req.user.id;
+
+    const order = await Order.findOne({ orderId, userId}).populate('items.productId');
+
+    if(!order) {
+      return res.status(404).json({
+        success : false,
+        message : 'Order not found',
+
+      })
+    }
+
+    if(order.status !== 'delivered') {
+      return res.status(404).json({
+        success : false,
+        message : 'Only delivered products can be returned'
+      })
+    }
+
+    const deliveryDate = new Date(order.deliveredAt || order.updatedAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - deliveryDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 7) {
+      return res.status(400).json({
+        success: false,
+        message: 'Return period has expired (7 days from delivery)'
+      });
+    }
+
+    order.status = 'return_requested';
+    order.returnReason = reason;
+    order.returnRequestedAt = new Date();
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Return request submitted successfully',
+      order
+    });
+  } catch (error) {
+    console.error('Error requesting return:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit return request'
+    });
+  }
+}
 

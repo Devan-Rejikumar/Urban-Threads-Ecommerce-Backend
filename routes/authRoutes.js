@@ -5,7 +5,7 @@ import passport from 'passport';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import addressController from '../controllers/user/addressController.js';
 import changePassword from '../controllers/user/changePasswordController.js';
-import cartController from '../controllers/user/cartController.js';
+// import cartController from '../controllers/user/cartController.js';
 
 const { getAddresses, getAddress, createAddress, updateAddress, deleteAddress } = addressController;
 

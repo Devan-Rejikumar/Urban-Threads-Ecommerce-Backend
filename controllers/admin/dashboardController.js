@@ -92,7 +92,7 @@ export const getDashboardStats = async (req, res) => {
             };
         });
 
-        // Top 10 Products
+        
         const topProducts = await Order.aggregate([
             {
                 $match: {
@@ -112,7 +112,7 @@ export const getDashboardStats = async (req, res) => {
                     totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
                 }
             },
-            { $sort: { totalRevenue: -1 } }, // Changed to sort by revenue
+            { $sort: { totalSales: -1 } }, 
             { $limit: 10 },
             {
                 $lookup: {
@@ -171,11 +171,11 @@ export const getDashboardStats = async (req, res) => {
                     totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
                 }
             },
-            { $sort: { totalRevenue: -1 } }, // Changed to sort by revenue
+            { $sort: { totalSales: -1 } }, 
             { $limit: 10 }
         ]);
 
-        // Recent Users
+    
         const recentUsers = await User.find({ role: 'user' })
             .sort({ createdAt: -1 })
             .limit(5)
