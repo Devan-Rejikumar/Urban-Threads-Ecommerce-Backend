@@ -2,6 +2,9 @@ import Admin from '../../models/Admin.js';
 import User from '../../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+
 
 export const adminLogin = async (req, res) => {
   const { email, password } = req.body;
@@ -79,7 +82,7 @@ export const blockUsers = async (req, res) => {
     const userId = req.params.id;
     const updatedUser = await User.findByIdAndUpdate(
       userId, 
-      { status: 'blocked' }, 
+      { status: 'blocked', token : null }, 
       { new: true }
     );
     
@@ -133,8 +136,6 @@ export const adminLogout = async (req, res) => {
 export const verifyAdminToken = async(req, res, next) => {
   try {
     const { adminToken } = req.cookies;
-    console.log('jjjjjjjjjjjjjjjjjjjjjjj',req.cookies)
-    console.log('ggggggggggggggggggg',adminToken);
     if (!adminToken) {
       return res.status(401).json({ message: 'Admin token not found' });
     }
@@ -148,5 +149,169 @@ export const verifyAdminToken = async(req, res, next) => {
   } catch (error) {
     console.error('Admin token verification error:', error);
     res.status(401).json({ message: 'Invalid or expired admin token' });
+  }
+};
+
+
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const createTransporter = async () => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+    
+    await transporter.verify();
+    return transporter;
+  } catch (error) {
+    console.error('Email configuration error:', error);
+    throw error;
+  }
+};
+
+const sendOTPEmail = async (email, otp) => {
+  try {
+    const transporter = await createTransporter();
+    
+    const mailOptions = {
+      from: `"Admin Password Reset" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Password Reset OTP',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Password Reset Request</h2>
+          <p>Your OTP for password reset is:</p>
+          <h1 style="color: #4CAF50; letter-spacing: 5px; text-align: center; padding: 10px; background: #f5f5f5; border-radius: 5px;">${otp}</h1>
+          <p style="color: #666;">This OTP will expire in 10 minutes.</p>
+          <p style="color: #999; font-size: 12px;">If you didn't request this password reset, please ignore this email.</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Email sending error:', error);
+    throw error;
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log('Processing forgot password for email:', email);
+
+    // Find admin by email
+    const admin = await Admin.findOne({ email: new RegExp(`^${email}$`, 'i') });
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'No admin account found with this email'
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    console.log('Generated OTP:', otp);
+
+    // Save OTP to admin document with expiry
+    admin.resetPasswordOTP = otp;
+    admin.resetPasswordOTPExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await admin.save();
+
+    // Send OTP email
+    await sendOTPEmail(email, otp);
+    
+    res.status(200).json({
+      success: true,
+      message: 'OTP has been sent to your email'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const admin = await Admin.findOne({
+      email: new RegExp(`^${email}$`, 'i'),
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpiry: { $gt: new Date() }
+    });
+
+    if (!admin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully'
+    });
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify OTP'
+    });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    // Find admin with matching email and valid OTP
+    const admin = await Admin.findOne({
+      email: new RegExp(`^${email}$`, 'i'),
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpiry: { $gt: new Date() }
+    });
+
+    if (!admin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password and clear OTP fields
+    admin.password = hashedPassword;
+    admin.resetPasswordOTP = undefined;
+    admin.resetPasswordOTPExpiry = undefined;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password has been reset successfully'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while resetting password'
+    });
   }
 };

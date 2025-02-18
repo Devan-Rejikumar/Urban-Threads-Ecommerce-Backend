@@ -228,13 +228,13 @@ const deleteCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-  
+    // Delete the image from Cloudinary if it exists
     if (category.image?.public_id) {
       await cloudinary.uploader.destroy(category.image.public_id);
     }
 
-    category.isDeleted = true;
-    await category.save();
+    // Actually delete the document from database
+    await Category.findByIdAndDelete(id);
 
     res.status(200).json({ message: "Category deleted successfully" });
   } catch (error) {
@@ -242,7 +242,6 @@ const deleteCategory = async (req, res) => {
     res.status(500).json({ message: "Error deleting category", error });
   }
 };
-
 const inactivateCategory = async (req, res) => {
   try {
     const { id } = req.params;

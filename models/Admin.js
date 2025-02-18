@@ -16,7 +16,14 @@ const AdminSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  // Add any other fields you need
+  resetPasswordToken: String,
+  resetPasswordExpiry: Date,
+  resetPasswordOTP: {
+    type: String
+  },
+  resetPasswordOTPExpiry: {
+    type: Date
+  }
 });
 
 const Admin = mongoose.model('Admin', AdminSchema);

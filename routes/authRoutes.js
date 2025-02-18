@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { registerUser, loginUser, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals, sendContactUpdateOTP, verifyContactUpdateOTP} from '../controllers/user/authController.js';
+import { registerUser, loginUser, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals, sendContactUpdateOTP, verifyContactUpdateOTP, verifyTokenAndStatus} from '../controllers/user/authController.js';
 import passport from 'passport';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import addressController from '../controllers/user/addressController.js';
@@ -17,12 +17,8 @@ const router = express.Router();
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
-// router.get('/verify-status', verifyStatus);
 router.post('/google-signup',handleGoogleSignup)
-
-// router.get('/verify-status', verifyToken, verifyStatus);
 router.get('/verify-token',verifyUserToken)
-
 router.post('/verify-otp', verifyOTP);
 router.post('/resend-otp', resendOTP);
 router.post('/logout', logout)
@@ -35,11 +31,8 @@ router.get("/google",
 router.post('/forgot-password', forgotPassword);
 router.get('/reset-password/:token', verifyResetToken);
 router.post('/reset-password/:token', resetPassword);
-
 router.get('/profile', verifyToken, getUserProfile)
 router.put('/profile/update', verifyToken, updateUsersProfile);
-
-
 router.get('/addresses',verifyToken, getAddresses);
 router.post('/address',verifyToken, createAddress);
 router.get('/address/:id', verifyToken, getAddress);
@@ -47,6 +40,7 @@ router.put('/address/:id',verifyToken, updateAddress);
 router.delete('/address/:id',verifyToken, deleteAddress);
 router.post('/send-contact-update-otp', verifyToken, sendContactUpdateOTP);
 router.post('/verify-contact-update-otp', verifyToken, verifyContactUpdateOTP);
+router.get('/verify-token-status', verifyToken, verifyTokenAndStatus);
 
 
 
@@ -66,8 +60,8 @@ const validatePasswordChange = (req,res,next) =>{
 
 router.put('/change-password', verifyToken, validatePasswordChange,changePassword)
 router.get('/search', advancedSearch);
+router.get('/new-arrivals', getNewArrivals );
 
-router.get('/new-arrivals', getNewArrivals )
 
 
 

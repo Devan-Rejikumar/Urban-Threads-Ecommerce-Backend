@@ -996,5 +996,32 @@ const verifyContactUpdateOTP = async (req, res) => {
 };
 
 
-export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals, sendContactUpdateOTP, verifyContactUpdateOTP };
+const verifyTokenAndStatus = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('email name status');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (user.status === 'blocked') {
+            return res.status(403).json({ message: 'Account is blocked' });
+        }
+
+        res.status(200).json({
+            valid: true,
+            user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                status: user.status
+            }
+        });
+    } catch (error) {
+        res.status(401).json({ message: 'Invalid token' });
+    }
+};
+
+
+export { registerUser, loginUser, googleCallback, verifyOTP, resendOTP, handleGoogleSignup, verifyStatus, logout, verifyUserToken, getUserProfile, updateUsersProfile, forgotPassword, verifyResetToken, resetPassword, advancedSearch, getNewArrivals, sendContactUpdateOTP, verifyContactUpdateOTP , verifyTokenAndStatus};
 

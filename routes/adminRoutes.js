@@ -9,7 +9,10 @@ import {
     unblockUsers, 
     validateToken, 
     adminLogout,
-    verifyAdminToken 
+    verifyAdminToken, 
+    forgotPassword,
+    resetPassword,
+    verifyOTP
 } from '../controllers/admin/adminController.js';
 
 const router = express.Router();
@@ -24,6 +27,9 @@ router.put('/users/:id/block', verifyAdminTokens, blockUsers);
 router.put('/users/:id/unblock', verifyAdminTokens, unblockUsers);
 router.post('/adminLogout', verifyAdminTokens, adminLogout);
 router.get('/verify-adminToken', verifyAdminToken);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.post('/verify-otp',verifyOTP);
 
 export default router;
 

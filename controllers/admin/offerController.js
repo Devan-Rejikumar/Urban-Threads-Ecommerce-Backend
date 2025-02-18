@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
 import Category from '../../models/Category.js';
 import Product from '../../models/Products.js';
 import Offer from '../../models/Offer.js';
+
 
 const priceCalculator = {
     calculateDiscountedPrice: (originalPrice, offer) => {
@@ -240,6 +242,13 @@ export const getOffers = async (req, res) => {
 
 export const getOffer = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid offer ID format'
+            });
+        }
+
         const offer = await Offer.findById(req.params.id)
             .populate({
                 path: 'applicableId',
@@ -258,13 +267,13 @@ export const getOffer = async (req, res) => {
             offer
         });
     } catch (error) {
+        console.error('Error fetching offer:', error);
         res.status(500).json({
             success: false,
             message: error.message
         });
     }
 };
-
 export const updateOffer = async (req, res) => {
     try {
         const { name, description, discountValue } = req.body;

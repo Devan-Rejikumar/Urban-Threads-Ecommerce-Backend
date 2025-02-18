@@ -28,9 +28,15 @@ export const verifyAdminTokens = async (req, res, next) => {
     next();
 
   } catch (error) {
-    console.error('Admin token verification error:', error);
-    
     if (error.name === 'TokenExpiredError') {
+      // Clear the expired cookie
+      res.clearCookie('adminToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/'
+      });
+      
       return res.status(401).json({ 
         success: false, 
         message: 'Admin token expired' 

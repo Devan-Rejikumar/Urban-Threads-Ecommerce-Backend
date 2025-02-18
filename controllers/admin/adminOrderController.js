@@ -3,25 +3,65 @@ import Order from "../../models/Order.js";
 import Wallet from '../../models/Wallet.js'
 
 export const getOrders = async (req, res) => {
-    try {
-        
-        console.log('Admin making request:', req.admin);
-        
-        const { status = 'All' } = req.query;
-        
-        const query = status !== 'All' ? { status: status.toLowerCase() } : {};
+    try {      
+        const { 
+            status = 'All', 
+            page = 1, 
+            limit = 10,
+            search = '' 
+        } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+        let query = {};
 
+
+        if (status !== 'All') {
+            query.status = status.toLowerCase();
+        }
+
+        // Add search conditions if search term exists
+        if (search) {
+            // First, find user IDs that match the search criteria
+            const userQuery = {
+                $or: [
+                    { firstName: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } }
+                ]
+            };
+
+            // Create the main query with OR conditions
+            query = {
+                ...query,
+                $or: [
+                    { orderId: { $regex: search, $options: 'i' } },
+                    { 'userId.firstName': { $regex: search, $options: 'i' } },
+                    { 'userId.email': { $regex: search, $options: 'i' } }
+                ]
+            };
+        }
+
+      
+        const totalOrders = await Order.countDocuments(query);
+
+   
         const orders = await Order.find(query)
             .populate('userId', 'firstName email')
             .populate('items.productId')
             .populate('addressId')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum);
 
         console.log('Found orders:', orders.length);
+        console.log('Total orders:', totalOrders);
 
         res.status(200).json({ 
             success: true, 
-            orders 
+            orders,
+            totalOrders,
+            currentPage: pageNum,
+            totalPages: Math.ceil(totalOrders / limitNum)
         });
     } catch (error) {
         console.error('Error fetching orders:', error);
@@ -32,7 +72,7 @@ export const getOrders = async (req, res) => {
     }
 };
 
-// Update order status
+
 export const updateOrderStatus = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -71,7 +111,7 @@ export const handleReturnRequest = async (req, res) => {
         const { orderId } = req.params;
         const { action, rejectionReason } = req.body;
 
-        // Change the query to find by _id instead of orderId
+       
         const order = await Order.findById(orderId).populate([
             { path: 'items.productId' },
             { path: 'userId' }

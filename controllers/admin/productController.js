@@ -53,17 +53,23 @@ const priceCalculator = {
 
 
 const getProducts = async (req, res) => {
-    try {
-       
-        const products = await Product.find().populate('category', 'name');  
-        if (!products || products.length === 0) {
-            return res.status(404).json({ error: "No products found asdfghj" });
-        }
-        res.status(200).json(products);
-    } catch (error) {
-        console.error('Error fetching products:', error);
-        res.status(500).json({ error: error.message });
-    }
+  try {
+    // Find products and populate category, but only get active categories
+    const products = await Product.find({
+      isDeleted: false,
+      isListed: true
+    }).populate({
+      path: 'category',
+      match: { isActive: true }
+    });
+    
+    // Filter out products with null categories (inactive categories)
+    const activeProducts = products.filter(product => product.category);
+    
+    res.status(200).json(activeProducts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 
