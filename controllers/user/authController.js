@@ -658,6 +658,7 @@ const updateUsersProfile = async (req, res) => {
         const { firstName, lastName, email, phone } = req.body;
         const validationErrors = {};
 
+        // Validate all fields
         if (!firstName) validationErrors.firstName = 'First name is mandatory';
         if (!lastName) validationErrors.lastName = 'Last name is mandatory';
         if (!email) {
@@ -665,24 +666,37 @@ const updateUsersProfile = async (req, res) => {
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             validationErrors.email = 'Invalid email format';
         }
-        if (!phone) validationErrors.phone = 'Phone number is mandatory';
+        if (!phone) {
+            validationErrors.phone = 'Phone number is mandatory';
+        } else if (!/^\d{10}$/.test(phone)) {
+            validationErrors.phone = 'Phone number must be exactly 10 digits';
+        }
 
         if (Object.keys(validationErrors).length > 0) {
             return res.status(400).json({
+                success: false,
                 message: 'Validation failed',
                 errors: validationErrors
             });
         }
 
-        const existingUser = await User.findOne({
-            email: email.toLowerCase(),
-            _id: { $ne: req.user.id }
-        })
+        // Check for existing email only if email is being changed
+        const currentUser = await User.findById(req.user.id);
+        if (email.toLowerCase() !== currentUser.email) {
+            const existingUser = await User.findOne({
+                email: email.toLowerCase(),
+                _id: { $ne: req.user.id }
+            });
 
-        if (existingUser) {
-            return res.status(400).json({ message: 'Email is already in use by another person' })
+            if (existingUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email is already in use by another person'
+                });
+            }
         }
 
+        // Update all fields
         const updatedUser = await User.findByIdAndUpdate(
             req.user.id,
             {
@@ -693,15 +707,18 @@ const updateUsersProfile = async (req, res) => {
                 updatedAt: Date.now()
             },
             { new: true }
+        );
 
-
-        )
         if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found' })
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
 
         res.status(200).json({
-            message: 'Profile updated Succesfully',
+            success: true,
+            message: 'Profile updated successfully',
             user: {
                 firstName: updatedUser.firstName,
                 lastName: updatedUser.lastName,
@@ -709,14 +726,15 @@ const updateUsersProfile = async (req, res) => {
                 phone: updatedUser.phone,
                 status: updatedUser.status
             }
-        })
+        });
     } catch (error) {
         console.error('Profile update error:', error);
         res.status(500).json({
+            success: false,
             message: 'Server error while updating profile'
         });
     }
-}
+};
 
 const forgotPassword = async (req, res) => {
     try {
@@ -889,6 +907,7 @@ const getNewArrivals = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(8)
             .populate('category')
+            .populate('currentOffer')
             .lean()  // Convert to plain JavaScript object
 
         // If category population fails, send products without category details

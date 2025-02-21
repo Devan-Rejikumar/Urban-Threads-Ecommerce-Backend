@@ -64,7 +64,7 @@ export const createOffer = async (req, res) => {
         }
 
         // Check if target exists
-        const Model = applicableType === 'product' ? Product : Category;
+        const Model = applicableType === 'Product' ? Product : Category;
         const target = await Model.findById(applicableId);
         
         if (!target) {
@@ -98,7 +98,7 @@ export const createOffer = async (req, res) => {
 
         await offer.save();
 
-        if (applicableType === 'product') {
+        if (applicableType === 'Product') {
             // Find category offer if exists
             const category = await Category.findById(target.category)
                 .select('currentOffer')
@@ -150,7 +150,7 @@ export const deleteOffer = async (req, res) => {
             });
         }
 
-        if (offer.applicableType === 'product') {
+        if (offer.applicableType === 'Product') {
             // Find the product
             const product = await Product.findById(offer.applicableId)
                 .populate('category');
@@ -164,7 +164,7 @@ export const deleteOffer = async (req, res) => {
 
             // Check if category has an active offer
             const categoryOffer = await Offer.findOne({
-                applicableType: 'category',
+                applicableType: 'Category',
                 applicableId: product.category,
             });
 
@@ -249,11 +249,13 @@ export const getOffer = async (req, res) => {
             });
         }
 
-        const offer = await Offer.findById(req.params.id)
+        const offer = await Offer.findById(req.params.id)      
             .populate({
                 path: 'applicableId',
                 select: 'name'
             });
+
+            console.log(offer,"offer cjxjcxbjhcxv")
 
         if (!offer) {
             return res.status(404).json({
@@ -292,12 +294,12 @@ export const updateOffer = async (req, res) => {
         await offer.save();
 
         // Recalculate prices if necessary
-        if (offer.applicableType === 'product') {
+        if (offer.applicableType === 'Product') {
             const product = await Product.findById(offer.applicableId)
                 .populate('category');
             
             const categoryOffer = await Offer.findOne({
-                applicableType: 'category',
+                applicableType: 'Category',
                 applicableId: product.category,
             });
 

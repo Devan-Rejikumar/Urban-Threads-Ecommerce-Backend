@@ -33,5 +33,6 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
-const Category = mongoose.model("Category", categorySchema); 
+// Option 1: Keep using "Category" but specify the collection name
+const Category = mongoose.model("Category", categorySchema, "categories");
 export default Category;

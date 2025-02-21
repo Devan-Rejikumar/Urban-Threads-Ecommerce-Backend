@@ -19,7 +19,7 @@ const offerSchema = new mongoose.Schema({
     },
     applicableType: {
         type: String,
-        enum: ['product', 'category'],
+        enum: ['Product', 'Category'],
         required: true
     },
     applicableId: {

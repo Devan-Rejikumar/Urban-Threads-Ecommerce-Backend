@@ -1,7 +1,8 @@
 import express from "express";
-import {getProducts, addProduct, editProduct, deleteProduct,getCategories, updateProduct, toggleProductListing, getProductsByCategory, getProductById , validateCartItems} from "../controllers/admin/productController.js";
+import {getProducts, addProduct, editProduct, deleteProduct,getCategories, updateProduct, toggleProductListing, getProductsByCategory, getProductById , validateCartItems, getAdminProducts} from "../controllers/admin/productController.js";
 import upload from "../middleware/multer.js";
 import { verifyAdminTokens } from "../middleware/adminMiddleware.js";
+import Product from "../models/Products.js";
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ router.put('/:id', upload.array('images', 10), updateProduct);
 router.patch('/:id', toggleProductListing);
 router.delete("/:id", deleteProduct); 
 router.post('/validate-cart',validateCartItems);
+router.get('/admin/products', getAdminProducts);
 router.get('/', verifyAdminTokens, async (req, res) => {
     try {
         const products = await Product.find({ isDeleted: false })

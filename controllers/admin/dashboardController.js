@@ -133,48 +133,65 @@ export const getDashboardStats = async (req, res) => {
         ]);
 
         // Top 10 Categories
-        const topCategories = await Order.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: startDate, $lte: endDate }
-                }
-            },
-            { $unwind: '$items' },
-            {
-                $match: {
-                    'items.status': { $nin: ['cancelled', 'returned'] }
-                }
-            },
-            {
-                $lookup: {
-                    from: 'products',
-                    localField: 'items.productId',
-                    foreignField: '_id',
-                    as: 'product'
-                }
-            },
-            { $unwind: '$product' },
-            {
-                $lookup: {
-                    from: 'categories',
-                    localField: 'product.category',
-                    foreignField: '_id',
-                    as: 'category'
-                }
-            },
-            { $unwind: '$category' },
-            {
-                $group: {
-                    _id: '$category._id',
-                    name: { $first: '$category.name' },
-                    totalSales: { $sum: '$items.quantity' },
-                    totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
-                }
-            },
-            { $sort: { totalSales: -1 } }, 
-            { $limit: 10 }
-        ]);
+       const topCategories = await Order.aggregate([
+    {
+        $match: {
+            createdAt: { $gte: startDate, $lte: endDate }
+        }
+    },
+    { $unwind: '$items' },
+    {
+        $match: {
+            'items.status': { $nin: ['cancelled', 'returned'] }
+        }
+    },
+    {
+        $lookup: {
+            from: 'products',
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product'
+        }
+    },
+    { $unwind: '$product' },
+    {
+        $lookup: {
+            from: 'categories',
+            localField: 'product.category',
+            foreignField: '_id',
+            as: 'category'
+        }
+    },
+    { $unwind: '$category' },
+    {
+        $group: {
+            _id: '$category._id',
+            name: { $first: '$category.name' },
+            totalSales: { $sum: '$items.quantity' },
+            totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
+        }
+    },
+    { $sort: { totalSales: -1 } },
+    { $limit: 10 },
+    // Add a $match stage to filter out any categories with null or zero values
+    {
+        $match: {
+            name: { $ne: null },
+            totalSales: { $gt: 0 },
+            totalRevenue: { $gt: 0 }
+        }
+    }
+]);
 
+// Add debug logging
+console.log('Top Categories Data:', {
+    count: topCategories.length,
+    categories: topCategories.map(cat => ({
+        name: cat.name,
+        sales: cat.totalSales,
+        revenue: cat.totalRevenue
+    }))
+});
     
         const recentUsers = await User.find({ role: 'user' })
             .sort({ createdAt: -1 })

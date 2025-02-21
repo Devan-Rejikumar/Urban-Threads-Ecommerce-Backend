@@ -72,6 +72,43 @@ const getProducts = async (req, res) => {
   }
 };
 
+const getAdminProducts = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9;
+    const skip = (page - 1) * limit;
+
+    // Get total count of products
+    const totalProducts = await Product.countDocuments({
+      isDeleted: false
+    });
+
+    // Find paginated products for admin
+    const products = await Product.find({
+      isDeleted: false
+    })
+    .populate({
+      path: 'category',
+      match: { isActive: true }
+    })
+    .skip(skip)
+    .limit(limit)
+    .sort({ createdAt: -1 });
+    
+    // Filter out products with null categories (inactive categories)
+    const activeProducts = products.filter(product => product.category);
+    
+    res.status(200).json({
+      products: activeProducts,
+      total: totalProducts,
+      currentPage: page,
+      totalPages: Math.ceil(totalProducts / limit)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 
 const uploadBase64ImagesToCloudinary = async (base64Images) => {
   try {
@@ -508,4 +545,4 @@ const validateCartItems = async (req, res) => {
   }
 };
 
-export { getProducts, addProduct, editProduct, softDeleteProduct, deleteProduct,getCategories , updateProduct, toggleProductListing, getProductsByCategory, getProductById, updateProductStock, validateCartItems};
+export { getProducts, addProduct, editProduct, softDeleteProduct, deleteProduct,getCategories , updateProduct, toggleProductListing, getProductsByCategory, getProductById, updateProductStock, validateCartItems, getAdminProducts };
